@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Berkeley Precinct Election Map</title>
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+  :root { --panel: 340px; --bg: #f7f7f5; --ink: #1a1a1a; --muted: #6b6b6b; --line: #e2e2dd; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); }
+  #app { display: grid; grid-template-columns: 1fr var(--panel); height: 100%; }
+  #map { position: relative; }
+  #panel { border-left: 1px solid var(--line); background: #fff; overflow-y: auto; padding: 16px 18px 40px; }
+  #controls { position: absolute; top: 12px; left: 12px; z-index: 5; background: rgba(255,255,255,.96);
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; width: 320px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+  #controls h1 { font-size: 14px; margin: 0 0 2px; letter-spacing: .2px; }
+  #controls .sub { font-size: 11px; color: var(--muted); margin-bottom: 10px; }
+  label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin: 8px 0 3px; }
+  select { width: 100%; padding: 6px 8px; font-size: 13px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  .modes { display: flex; gap: 4px; margin-top: 4px; }
+  .modes button { flex: 1; font-size: 12px; padding: 6px 4px; border: 1px solid var(--line); background: #fff; border-radius: 6px; cursor: pointer; }
+  .modes button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+  #rcvNote { display: none; margin-top: 8px; font-size: 11px; background: #fff7e6; border: 1px solid #f0d9a8; color: #8a5a00; padding: 6px 8px; border-radius: 6px; }
+  #legend { position: absolute; bottom: 14px; left: 12px; z-index: 5; background: rgba(255,255,255,.96);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; max-width: 300px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+  #legend .row { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+  #legend .sw { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.15); flex: none; }
+  #panel .ph { color: var(--muted); font-size: 13px; margin-top: 30px; text-align: center; }
+  #panel h2 { font-size: 15px; margin: 0 0 2px; }
+  #panel .pmeta { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+  table.res { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.res td { padding: 4px 2px; border-bottom: 1px solid var(--line); }
+  table.res td.v { text-align: right; font-variant-numeric: tabular-nums; }
+  table.res td.p { text-align: right; color: var(--muted); width: 52px; font-variant-numeric: tabular-nums; }
+  table.res tr.win td { font-weight: 700; }
+  .bar { height: 4px; background: #d9d9d3; border-radius: 2px; margin-top: 3px; }
+  .bar > span { display: block; height: 100%; border-radius: 2px; }
+  .turnout-box { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 14px 0; font-size: 13px; }
+  .turnout-box b { font-size: 18px; }
+  a.src { color: #2a6; }
+  .credit { font-size: 11px; color: var(--muted); margin-top: 24px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="map">
+    <div id="controls">
+      <h1>Berkeley Precinct Election Map</h1>
+      <div class="sub" id="focusNote">Focus: City Council District 1 (outlined)</div>
+      <label>Election</label>
+      <select id="electionSel"></select>
+      <label>Contest</label>
+      <select id="contestSel"></select>
+      <label>Map mode</label>
+      <div class="modes">
+        <button data-mode="winner" class="active">Winner</button>
+        <button data-mode="choice">% for choice</button>
+        <button data-mode="turnout">Turnout</button>
+      </div>
+      <div id="choiceWrap" style="display:none">
+        <label>Choice</label>
+        <select id="choiceSel"></select>
+      </div>
+      <div id="rcvNote">⚑ Ranked-choice contest — precinct data is <b>first-choice only</b>. No precinct-level RCV redistribution exists.</div>
+    </div>
+    <div id="legend"></div>
+  </div>
+  <div id="panel">
+    <div class="ph">Click a precinct to see full results.</div>
+  </div>
+</div>
+<script>
+const DATA = "./data";
+// categorical palette for winner / choices
+const CAT = ["#4e79a7","#e15759","#59a14f","#f28e2b","#b07aa1","#76b7b2","#edc948","#9c755f","#bab0ac","#ff9da7"];
+const YESNO = { "YES":"#2b8cbe", "NO":"#e34a33" };
+const RAMP = ["#f7fbff","#c6dbef","#6baed6","#2171b5","#08306b"]; // sequential blue
+
+const state = { election:null, contest:null, mode:"winner", choice:null, results:null, catalog:null };
+let map, elections;
+
+const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+const winnerOf = ch => Object.entries(ch).filter(([k])=>!k.startsWith("_"))
+  .reduce((a,b)=> b[1]>a[1]?b:a, ["",-1]);
+
+async function boot() {
+  elections = (await (await fetch(`${DATA}/elections.json`)).json()).elections;
+  const esel = document.getElementById("electionSel");
+  elections.forEach(e => esel.add(new Option(e.name, e.id)));
+
+  map = new maplibregl.Map({
+    container: "map",
+    style: {
+      version: 8,
+      glyphs: "https://basemaps.cartocdn.com/gl/positron-gl-style/glyphs/{fontstack}/{range}.pbf",
+      sources: { carto: { type:"raster", tiles:["https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"], tileSize:256, attribution:"© OpenStreetMap © CARTO" } },
+      layers: [{ id:"base", type:"raster", source:"carto" }]
+    },
+    center: [-122.29, 37.884], zoom: 12.4
+  });
+  window._map = map;
+  map.on("error", e => console.error("MAP ERROR:", e && e.error && e.error.message));
+  map.addControl(new maplibregl.NavigationControl({ showCompass:false }), "bottom-right");
+  map.on("load", async () => {
+    try {
+      await loadStaticOverlays();
+      parseHash();
+      esel.value = state.election;
+      await loadElection(state.election);
+      wireControls();
+      window._ready = true;
+    } catch (err) { console.error("LOAD HANDLER FAILED:", err && err.stack || err); }
+  });
+}
+
+async function loadStaticOverlays() {
+  const d1 = await (await fetch(`${DATA}/geo/d1_boundary.geojson`)).json();
+  const cd = await (await fetch(`${DATA}/geo/council_districts.geojson`)).json();
+  map.addSource("cd", { type:"geojson", data:cd });
+  map.addSource("d1", { type:"geojson", data:d1 });
+  // faint all-district lines for context
+  map.addLayer({ id:"cd-line", type:"line", source:"cd",
+    paint:{ "line-color":"#888", "line-width":0.8, "line-dasharray":[2,2], "line-opacity":0.5 } });
+}
+
+async function loadElection(id) {
+  state.election = id;
+  const meta = elections.find(e=>e.id===id);
+  state.results = await (await fetch(`${DATA}/${meta.results}`)).json();
+  state.catalog = state.results.contests;
+  // geometry for this election (precinct IDs are election-specific)
+  const geo = await (await fetch(`${DATA}/${meta.geo}`)).json();
+  if (map.getLayer("precincts-fill")) { map.removeLayer("precincts-fill"); }
+  if (map.getLayer("precincts-line")) { map.removeLayer("precincts-line"); }
+  if (map.getSource("precincts")) { map.removeSource("precincts"); }
+  map.addSource("precincts", { type:"geojson", data:geo, promoteId:"precinct" });
+  map.addLayer({ id:"precincts-fill", type:"fill", source:"precincts",
+    paint:{ "fill-color":["coalesce",["feature-state","color"],"#ddd"], "fill-opacity":0.82 } }, "cd-line");
+  map.addLayer({ id:"precincts-line", type:"line", source:"precincts",
+    paint:{ "line-color":"#fff", "line-width":0.6 } }, "cd-line");
+  // D1 boundary emphasized ON TOP
+  if (!map.getLayer("d1-line")) {
+    map.addLayer({ id:"d1-line", type:"line", source:"d1",
+      paint:{ "line-color":"#111", "line-width":2.4 } });
+  }
+  // fit to precincts
+  const b = new maplibregl.LngLatBounds();
+  geo.features.forEach(f => eachCoord(f.geometry, c => b.extend(c)));
+  map.fitBounds(b, { padding: {top:110,left:360,right:40,bottom:60}, duration:0 });
+
+  map.on("click", "precincts-fill", e => showPrecinct(e.features[0].properties.precinct));
+  map.on("mouseenter", "precincts-fill", ()=> map.getCanvas().style.cursor="pointer");
+  map.on("mouseleave", "precincts-fill", ()=> map.getCanvas().style.cursor="");
+
+  buildContestPicker();
+  if (!state.contest || !(state.contest in state.catalog)) {
+    state.contest = pickDefaultContest();
+  }
+  render();
+}
+
+function pickDefaultContest() {
+  const names = Object.keys(state.catalog);
+  return names.find(n => /^Mayor - Berkeley/.test(n)) || names[0];
+}
+
+function eachCoord(geom, fn) {
+  const walk = a => { if (typeof a[0] === "number") fn(a); else a.forEach(walk); };
+  walk(geom.coordinates);
+}
+
+function buildContestPicker() {
+  const sel = document.getElementById("contestSel");
+  sel.innerHTML = "";
+  // group: Berkeley city first, then others
+  const names = Object.keys(state.catalog);
+  const berk = names.filter(n=>/Berkeley/.test(n));
+  const other = names.filter(n=>!/Berkeley/.test(n));
+  const addGroup = (label, arr) => {
+    if (!arr.length) return;
+    const og = document.createElement("optgroup"); og.label = label;
+    arr.forEach(n => og.appendChild(new Option(n + (state.catalog[n].rcv?"  (RCV)":""), n)));
+    sel.appendChild(og);
+  };
+  addGroup("Berkeley city / schools", berk);
+  addGroup("County · State · Federal · Props", other);
+  sel.value = state.contest;
+}
+
+function buildChoicePicker() {
+  const sel = document.getElementById("choiceSel");
+  sel.innerHTML = "";
+  state.catalog[state.contest].choices.forEach(c => sel.add(new Option(c, c)));
+  if (!state.choice || !state.catalog[state.contest].choices.includes(state.choice))
+    state.choice = state.catalog[state.contest].choices[0];
+  sel.value = state.choice;
+}
+
+function colorForContest() {
+  // map winner choice -> stable color for the current contest
+  const choices = state.catalog[state.contest].choices;
+  const isMeasure = state.catalog[state.contest].kind === "measure";
+  const cmap = {};
+  choices.forEach((c,i) => {
+    cmap[c] = isMeasure && YESNO[c.toUpperCase()] ? YESNO[c.toUpperCase()] : CAT[i % CAT.length];
+  });
+  return cmap;
+}
+
+function rampColor(t) { // t in [0,1]
+  const n = RAMP.length - 1, x = Math.max(0, Math.min(1, t)) * n;
+  const i = Math.floor(x), f = x - i;
+  const a = hex2rgb(RAMP[i]), b = hex2rgb(RAMP[Math.min(i+1,n)]);
+  return `rgb(${a.map((v,k)=>Math.round(v+(b[k]-v)*f)).join(",")})`;
+}
+const hex2rgb = h => [1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+
+function render() {
+  const cat = state.catalog[state.contest];
+  document.getElementById("rcvNote").style.display = cat.rcv ? "block" : "none";
+  document.getElementById("choiceWrap").style.display = state.mode==="choice" ? "block" : "none";
+  document.getElementById("contestSel").value = state.contest;
+  if (state.mode === "choice") buildChoicePicker();
+
+  const cmap = colorForContest();
+  const precincts = state.results.precincts;
+  // clear existing states then set
+  Object.entries(precincts).forEach(([pid, p]) => {
+    let color = "#e5e5e5";
+    if (state.mode === "turnout") {
+      const t = p.registered ? p.ballots_cast / p.registered : 0;
+      color = rampColor(t);
+    } else {
+      const c = p.contests[state.contest];
+      if (c) {
+        if (state.mode === "winner") {
+          const [w] = winnerOf(c.choices);
+          color = cmap[w] || "#bbb";
+        } else { // choice %
+          const tot = Object.values(c.choices).reduce((a,b)=>a+b,0);
+          const v = c.choices[state.choice] || 0;
+          color = rampColor(tot ? v/tot : 0);
+        }
+      } else color = "#eee"; // contest not on this precinct's ballot
+    }
+    map.setFeatureState({ source:"precincts", id:pid }, { color });
+  });
+  buildLegend(cmap);
+  updateHash();
+}
+
+function buildLegend(cmap) {
+  const el = document.getElementById("legend");
+  const cat = state.catalog[state.contest];
+  if (state.mode === "turnout") {
+    el.innerHTML = `<div style="font-weight:600;margin-bottom:4px">Turnout (ballots / registered)</div>`
+      + gradientBar(["0%","25%","50%","75%","100%"]);
+  } else if (state.mode === "choice") {
+    el.innerHTML = `<div style="font-weight:600;margin-bottom:4px">% for ${esc(state.choice)}</div>`
+      + gradientBar(["0%","","50%","","100%"]);
+  } else {
+    el.innerHTML = `<div style="font-weight:600;margin-bottom:4px">Winner${cat.rcv?" (1st choice)":""}</div>`
+      + cat.choices.map(c=>`<div class="row"><span class="sw" style="background:${cmap[c]}"></span>${esc(c)}</div>`).join("");
+  }
+}
+function gradientBar(labels){
+  const stops = RAMP.join(",");
+  return `<div style="height:12px;border-radius:3px;background:linear-gradient(90deg,${stops})"></div>`
+    + `<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:2px">`
+    + labels.map(l=>`<span>${l}</span>`).join("") + `</div>`;
+}
+
+function showPrecinct(pid) {
+  const p = state.results.precincts[pid];
+  const panel = document.getElementById("panel");
+  if (!p) { panel.innerHTML = `<div class="ph">No data for precinct ${pid}.</div>`; return; }
+  const cat = state.catalog[state.contest];
+  const c = p.contests[state.contest];
+  const turnoutPct = p.registered ? (100*p.ballots_cast/p.registered).toFixed(1) : "—";
+  let html = `<h2>Precinct ${pid}</h2>`
+    + `<div class="pmeta">${esc(elections.find(e=>e.id===state.election).name)}</div>`
+    + `<div class="turnout-box">Turnout &nbsp; <b>${turnoutPct}%</b><br>`
+    + `<span style="color:var(--muted)">${(p.ballots_cast||0).toLocaleString()} ballots / ${(p.registered||0).toLocaleString()} registered</span></div>`;
+  if (!c) {
+    html += `<div class="ph" style="margin-top:10px">“${esc(state.contest)}” was not on this precinct’s ballot.</div>`;
+  } else {
+    const cmap = colorForContest();
+    const entries = Object.entries(c.choices).sort((a,b)=>b[1]-a[1]);
+    const tot = entries.reduce((a,[,v])=>a+v,0);
+    const [win] = winnerOf(c.choices);
+    html += `<h2 style="margin-top:8px">${esc(state.contest)}</h2>`
+      + `<div class="pmeta">${cat.rcv?"Ranked-choice · first-choice votes":"Total votes"} · ${tot.toLocaleString()} cast</div>`
+      + `<table class="res">`
+      + entries.map(([name,v])=>{
+          const pct = tot? (100*v/tot):0;
+          return `<tr class="${name===win?"win":""}"><td>${esc(name)}`
+            + `<div class="bar"><span style="width:${pct.toFixed(1)}%;background:${cmap[name]||"#999"}"></span></div></td>`
+            + `<td class="v">${v.toLocaleString()}</td><td class="p">${pct.toFixed(1)}%</td></tr>`;
+        }).join("")
+      + (c.over!=null||c.under!=null ? `<tr><td style="color:var(--muted)">over / under votes</td><td class="v">${(c.over||0)}/${(c.under||0)}</td><td></td></tr>`:"")
+      + `</table>`;
+  }
+  const src = elections.find(e=>e.id===state.election).sources || {};
+  html += `<div class="credit">Data: Alameda County ROV Statement of Vote, verified against the certified District Canvass. `
+    + `District 1 boundary: City of Berkeley (2022 redistricting). `
+    + (src.election_page?`<a class="src" href="${src.election_page}" target="_blank">source</a>`:"")
+    + `</div>`;
+  panel.innerHTML = html;
+}
+
+function wireControls() {
+  document.getElementById("electionSel").onchange = e => { state.contest=null; loadElection(e.target.value); };
+  document.getElementById("contestSel").onchange = e => { state.contest=e.target.value; render(); };
+  document.getElementById("choiceSel").onchange = e => { state.choice=e.target.value; render(); };
+  document.querySelectorAll(".modes button").forEach(b => b.onclick = () => {
+    document.querySelectorAll(".modes button").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active"); state.mode = b.dataset.mode; render();
+  });
+}
+
+function updateHash() {
+  const parts = [state.election, slug(state.contest), state.mode];
+  if (state.mode==="choice") parts.push(slug(state.choice));
+  history.replaceState(null,"","#"+parts.join("/"));
+}
+function parseHash() {
+  const h = location.hash.replace(/^#/,"").split("/");
+  state.election = elections.find(e=>e.id===h[0])?.id || elections[0].id;
+  // contest/mode/choice resolved after catalog loads
+  if (h[2]) state.mode = ["winner","choice","turnout"].includes(h[2]) ? h[2] : "winner";
+  document.querySelectorAll(".modes button").forEach(b=>{
+    b.classList.toggle("active", b.dataset.mode===state.mode);
+  });
+  state._pendingContestSlug = h[1]; state._pendingChoiceSlug = h[3];
+}
+
+// resolve pending slugs once catalog is known (called in buildContestPicker path)
+const _origRender = render;
+render = function(){
+  if (state._pendingContestSlug) {
+    const m = Object.keys(state.catalog).find(n=>slug(n)===state._pendingContestSlug);
+    if (m) state.contest = m; state._pendingContestSlug = null;
+  }
+  if (state._pendingChoiceSlug) {
+    const m = (state.catalog[state.contest]?.choices||[]).find(c=>slug(c)===state._pendingChoiceSlug);
+    if (m) state.choice = m; state._pendingChoiceSlug = null;
+  }
+  _origRender();
+};
+
+const esc = s => String(s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+boot();
+</script>
+</body>
+</html>
