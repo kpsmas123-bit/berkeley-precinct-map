@@ -4,24 +4,33 @@ Static web map showing **precinct-level results** for Berkeley-relevant election
 (~2014–present), with a focus on **City Council District 1**. Python ingestion →
 static JSON/GeoJSON → MapLibre GL JS frontend. No backend.
 
-**Status:** 8 elections built (2018–2024). General elections reconcile **exactly**
-against the certified District Canvass where one was published.
+**Status:** all 13 post-2014 elections built (2014–2024). Where the county
+published a certified District Canvass, contests reconcile **exactly** against it;
+older elections have no canvass and are spot-checked against known results.
 
-| Election | Format | Precincts | District map | Reconciliation |
+| Election | Format | Precincts | Map | Reconciliation |
 |---|---|---|---|---|
 | 2024-11 General | xlsx | 32 | 2021 | 39/39 exact |
-| 2024-03 Presidential Primary | xlsx | 31 | 2021 | 14 exact, 7 minor-party sub-contests flagged ⚠ |
+| 2024-03 Pres. Primary | xlsx | 31 | 2021 | 14 exact, 7 minor-party sub-contests flagged ⚠ |
 | 2022-11 General | xlsx | 31 | 2021 | 46/46 exact (incl. D1 council) |
 | 2022-06 Primary | xlsx | 28 | 2021 | 22/22 exact |
-| 2021-09 Gubernatorial Recall | csv | 32 | 2013 | no canvass published (unreconciled) |
-| 2020-11 General | csv | 32 | 2013 | no canvass published (spot-checked) |
-| 2020-03 Presidential Primary | csv | 75 | 2013 | no canvass published (spot-checked) |
-| 2018-11 General | csv | 106 | 2013 | no canvass; no turnout column in source |
+| 2021-09 Gubernatorial Recall | csv | 32 | 2013 | no canvass published |
+| 2020-11 General | csv | 32 | 2013 | no canvass (spot-checked: Arreguín) |
+| 2020-03 Pres. Primary | csv | 75 | 2013 | no canvass (spot-checked: Sanders>Warren) |
+| 2018-11 General | csv | 106 | 2013 | no canvass; source has no turnout column |
+| 2018-06 Primary | xls | 106 | 2013 | no canvass published |
+| 2016-11 General | xls | 107 | 2013 | no canvass (spot-checked: Arreguín>Capitelli) |
+| 2016-06 Pres. Primary | xls | 104 | 2013 | no canvass (spot-checked: Sanders>Clinton) |
+| 2014-11 General | xls | 103 | 2013 | no canvass (spot-checked: Brown); borrowed 2016 geometry |
+| 2014-06 Primary | xls | 93 | 2013 | no canvass; borrowed 2016 geometry |
 
-Pre-2020 elections use the county's un-consolidated precincts (many more, smaller);
-COVID all-mail voting consolidated Berkeley to ~30 precincts from Nov 2020 on.
-Adding an election is a manifest entry in `data/processed/elections.json` — the
-canvass format (`xlsx` SOV vs `csv` SOVC) is auto-dispatched.
+Three canvass formats are auto-dispatched from the manifest `format` field: modern
+`xlsx` SOV, legacy OLE2 `.xls` SOV (read via `xlrd`), and long-format `csv` SOVC.
+Pre-2020 elections use the county's un-consolidated precincts (100+, smaller); COVID
+all-mail voting consolidated Berkeley to ~30 from Nov 2020 on. 2014 has no precinct
+GeoJSON published, so it borrows the 2016 (same-era) geometry (~99.7% id match; a few
+no-data precincts render empty). Adding an election is a manifest entry —
+`./build.sh all` (re-run any election that hits a transient download error).
 
 ## Quick start
 

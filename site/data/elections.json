@@ -178,6 +178,38 @@
         "election_page": "https://acvote.alamedacountyca.gov/election-information/elections"
       },
       "notes": "Legacy .xls SOV; no District Canvass published (not reconciled)."
+    },
+    {
+      "id": "2014-11-general",
+      "date": "2014-11-04",
+      "name": "November 4, 2014 General Election",
+      "results": "results/2014-11-general.json",
+      "geo": "geo/2014-11-general.geojson",
+      "districts_geo": "geo/2014-11-general.districts.geojson",
+      "district_map": "berkeley-council-2013",
+      "format": "xls",
+      "sources": {
+        "sov": "https://acvote.alamedacountyca.gov/acvote-assets/pdf/elections/2014/11042014/results/nov-4-2014-statement-of-vote-results.xls",
+        "precincts_geojson": "https://opendata.arcgis.com/api/v3/datasets/11df17fd01fb4f88a3fde8262b895ecc/downloads/data?format=geojson&spatialRefId=4326",
+        "election_page": "https://acvote.alamedacountyca.gov/election-information/elections"
+      },
+      "notes": "Legacy .xls SOV; no District Canvass published (not reconciled). No 2014 precinct GeoJSON exists, so geometry is borrowed from the 2016 consolidated precincts (same 2013-era layout; ~99.7% of 2014 precinct ids match)."
+    },
+    {
+      "id": "2014-06-primary",
+      "date": "2014-06-03",
+      "name": "June 3, 2014 Direct Primary Election",
+      "results": "results/2014-06-primary.json",
+      "geo": "geo/2014-06-primary.geojson",
+      "districts_geo": "geo/2014-06-primary.districts.geojson",
+      "district_map": "berkeley-council-2013",
+      "format": "xls",
+      "sources": {
+        "sov": "https://acvote.alamedacountyca.gov/acvote-assets/pdf/elections/2014/06032014/results/jun-3-2014-statement-of-vote-results.xls",
+        "precincts_geojson": "https://opendata.arcgis.com/api/v3/datasets/b0ce6a21a7094f55ad30a88f7aecb42c/downloads/data?format=geojson&spatialRefId=4326",
+        "election_page": "https://acvote.alamedacountyca.gov/election-information/elections"
+      },
+      "notes": "Legacy .xls SOV; no District Canvass published (not reconciled). Geometry borrowed from the 2016 June primary consolidated precincts (2013-era layout)."
     }
   ]
 }
