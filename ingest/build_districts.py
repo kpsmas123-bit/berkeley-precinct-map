@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-Build the Berkeley council-district overlays from the 2022 redistricting layer:
-  - d1_boundary.geojson      (District 1 only, emphasized overlay)
-  - council_districts.geojson (all 8 districts, faint context lines)
+Build the per-election council-district overlay (all districts, simplified for
+display) from the district-boundary set in effect for that election. The frontend
+draws every district faintly and emphasizes the focus district (D1) by filtering on
+the `district` property, so one file per election is enough.
 
-These are current district lines and are drawn on EVERY election. Note: precincts
-before the 2021 redistricting do not nest cleanly into these boundaries, so the
-overlay is a reference, not a basis for historical D1 vote aggregation.
+Note: these are the era-correct lines for the election. Because Berkeley redistricts
+each decade, "District 1" in a pre-2021 election is a different geographic area than
+current D1 — the overlay is drawn honestly per era, not back-projected.
 
 Usage:
-  build_districts.py <council_districts_2022.geojson> <out_dir>
+  build_districts.py <district_map.geojson> <out.districts.geojson>
 """
 import json
-import os
 import sys
 
 from shapely.geometry import shape, mapping
@@ -22,8 +22,7 @@ ND = 6
 
 
 def simp(geom):
-    g = shape(geom).simplify(TOL, preserve_topology=True)
-    m = mapping(g)
+    m = mapping(shape(geom).simplify(TOL, preserve_topology=True))
     rc = lambda c: [round(x, ND) for x in c]
     if m["type"] == "Polygon":
         m["coordinates"] = [[rc(p) for p in r] for r in m["coordinates"]]
@@ -33,22 +32,17 @@ def simp(geom):
 
 
 def main():
-    src, out_dir = sys.argv[1], sys.argv[2]
+    src, out = sys.argv[1], sys.argv[2]
     gj = json.load(open(src))
-    feats = gj["features"]
-
-    def feat(f):
-        return {"type": "Feature",
-                "properties": {"district": f["properties"]["DISTRICT"],
-                               "member": f["properties"].get("MEMBER_NAME")},
-                "geometry": simp(f["geometry"])}
-
-    d1 = [f for f in feats if str(f["properties"]["DISTRICT"]) == "1"][0]
-    json.dump({"type": "FeatureCollection", "features": [feat(d1)]},
-              open(os.path.join(out_dir, "d1_boundary.geojson"), "w"), separators=(",", ":"))
-    json.dump({"type": "FeatureCollection", "features": [feat(f) for f in feats]},
-              open(os.path.join(out_dir, "council_districts.geojson"), "w"), separators=(",", ":"))
-    print(f"districts: d1_boundary.geojson + council_districts.geojson ({len(feats)} districts) -> {out_dir}")
+    feats = [{"type": "Feature",
+              "properties": {"district": str(f["properties"]["district"]),
+                             "member": f["properties"].get("member")},
+              "geometry": simp(f["geometry"])}
+             for f in gj["features"]]
+    feats.sort(key=lambda f: int(f["properties"]["district"]))
+    json.dump({"type": "FeatureCollection", "features": feats},
+              open(out, "w"), separators=(",", ":"))
+    print(f"districts overlay: {len(feats)} districts -> {out}")
 
 
 if __name__ == "__main__":

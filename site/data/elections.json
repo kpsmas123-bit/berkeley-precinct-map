@@ -6,6 +6,8 @@
       "name": "November 5, 2024 General Election",
       "results": "results/2024-11-general.json",
       "geo": "geo/2024-11-general.geojson",
+      "district_map": "berkeley-council-2021",
+      "districts_geo": "geo/2024-11-general.districts.geojson",
       "sources": {
         "canvass_sov_xlsx": "https://acvote.alamedacountyca.gov/acvote-assets/02_election_information/SOV/20241105/Statement%20of%20Vote%20-%20General%20Election.xlsx",
         "district_canvass_xlsx": "https://acvote.alamedacountyca.gov/acvote-assets/02_election_information/SOV/20241105/District%20Canvas%20-%20General%20Election.xlsx",

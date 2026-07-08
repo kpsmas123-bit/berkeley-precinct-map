@@ -21,13 +21,4 @@ case "$EID" in
 esac
 echo "downloaded raw files -> $RAW"
 ls -la "$RAW"
-
-# Current Berkeley council districts (2022 redistricting) — shared overlay, election-independent.
-CD="$ROOT/data/raw/council_districts_2022.geojson"
-if [ ! -s "$CD" ]; then
-  curl -sSL -G \
-    "https://services1.arcgis.com/IYiCpZoSIq9lAxi8/arcgis/rest/services/Council_Districts_2022/FeatureServer/2/query" \
-    --data-urlencode "where=1=1" --data-urlencode "outFields=DISTRICT,MEMBER_NAME" \
-    --data-urlencode "f=geojson" --data-urlencode "outSR=4326" -o "$CD"
-  echo "downloaded council districts -> $CD"
-fi
+# Council-district boundary sets are fetched separately by ingest/fetch_district_maps.py.
