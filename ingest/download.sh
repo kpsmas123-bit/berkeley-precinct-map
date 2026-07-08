@@ -20,7 +20,7 @@ s = e["sources"]
 print(e.get("format", "xlsx"), s["sov"], s.get("district_canvass_xlsx", "-"), s["precincts_geojson"])
 PY
 )
-EXT="xlsx"; [ "$FMT" = "csv" ] && EXT="csv"
+EXT="$FMT"   # xlsx | xls | csv — the saved sov file extension
 
 # Some acvote/ArcGIS endpoints reject the default curl UA (500) or a missing
 # Referer (403), so send a browser UA + the data hub as Referer on every request.
@@ -39,7 +39,7 @@ fetch() {  # url dest min_bytes label
 }
 
 echo "downloading $EID -> $RAW"
-rm -f "$RAW/sov.xlsx" "$RAW/sov.csv" "$RAW/district_canvass.xlsx"  # avoid stale from a prior format
+rm -f "$RAW/sov.xlsx" "$RAW/sov.xls" "$RAW/sov.csv" "$RAW/district_canvass.xlsx"  # avoid stale from a prior format
 fetch "$SOV" "$RAW/sov.$EXT"             20000 "sov.$EXT"
 fetch "$GEO" "$RAW/precincts.geojson"    10000 "precincts.geojson"
 if [ "$DC" != "-" ]; then

@@ -130,6 +130,54 @@
         "election_page": "https://acvote.alamedacountyca.gov/election-information/elections?id=236"
       },
       "notes": "SOVC CSV; no District Canvass published, so contests are not reconciled here. Mayor + council (D2/3/5/6) are RCV, first-choice only."
+    },
+    {
+      "id": "2016-11-general",
+      "date": "2016-11-08",
+      "name": "November 8, 2016 General Election",
+      "results": "results/2016-11-general.json",
+      "geo": "geo/2016-11-general.geojson",
+      "districts_geo": "geo/2016-11-general.districts.geojson",
+      "district_map": "berkeley-council-2013",
+      "format": "xls",
+      "sources": {
+        "sov": "https://acvote.alamedacountyca.gov/acvote-assets/pdf/elections/2016/11082016/results/november-8-2016-statement-of-vote-results.xls",
+        "precincts_geojson": "https://opendata.arcgis.com/api/v3/datasets/11df17fd01fb4f88a3fde8262b895ecc/downloads/data?format=geojson&spatialRefId=4326",
+        "election_page": "https://acvote.alamedacountyca.gov/election-information/elections"
+      },
+      "notes": "Legacy .xls SOV; no District Canvass published (not reconciled). Berkeley Mayor (Arreguín) + council D2/3/5/6 are RCV, first-choice only."
+    },
+    {
+      "id": "2016-06-primary",
+      "date": "2016-06-07",
+      "name": "June 7, 2016 Presidential Primary Election",
+      "results": "results/2016-06-primary.json",
+      "geo": "geo/2016-06-primary.geojson",
+      "districts_geo": "geo/2016-06-primary.districts.geojson",
+      "district_map": "berkeley-council-2013",
+      "format": "xls",
+      "sources": {
+        "sov": "https://acvote.alamedacountyca.gov/acvote-assets/pdf/elections/2016/06072016/results/jun-7-2016-statement-of-vote-results.xls",
+        "precincts_geojson": "https://opendata.arcgis.com/api/v3/datasets/b0ce6a21a7094f55ad30a88f7aecb42c/downloads/data?format=geojson&spatialRefId=4326",
+        "election_page": "https://acvote.alamedacountyca.gov/election-information/elections"
+      },
+      "notes": "Legacy .xls SOV; no District Canvass published (not reconciled)."
+    },
+    {
+      "id": "2018-06-primary",
+      "date": "2018-06-05",
+      "name": "June 5, 2018 Direct Primary Election",
+      "results": "results/2018-06-primary.json",
+      "geo": "geo/2018-06-primary.geojson",
+      "districts_geo": "geo/2018-06-primary.districts.geojson",
+      "district_map": "berkeley-council-2013",
+      "format": "xls",
+      "sources": {
+        "sov": "https://acvote.alamedacountyca.gov/acvote-assets/02_election_information/PDFs/20180605/en/Results/June%205%202018%20Statement%20of%20Vote%20Results%20Spreadsheet.xls",
+        "precincts_geojson": "https://opendata.arcgis.com/api/v3/datasets/28ee7bd8fd9e4a1f91882eb80bd9b8d8/downloads/data?format=geojson&spatialRefId=4326",
+        "election_page": "https://acvote.alamedacountyca.gov/election-information/elections"
+      },
+      "notes": "Legacy .xls SOV; no District Canvass published (not reconciled)."
     }
   ]
 }

@@ -65,24 +65,66 @@ def as_int(v):
         return 0
 
 
-def parse_contest_sheet(ws):
-    """Return (contest_name, rcv, choice_cols, novote_cols, rows) or None."""
-    rows = list(ws.iter_rows(values_only=True))
+def norm_pid(v):
+    if v is None:
+        return ""
+    if isinstance(v, float):
+        return str(int(v)) if v == int(v) else str(v)
+    s = str(v).strip()
+    if s.endswith(".0") and s[:-2].isdigit():
+        s = s[:-2]
+    return s
+
+
+def is_label(h):  # registered / voters-or-ballots cast / turnout — the fixed stat columns
+    low = h.lower()
+    return ("registered" in low or "turnout" in low
+            or "ballots cast" in low or "voters cast" in low)
+
+
+def load_sheets(path):
+    """Yield (sheet_name, rows) for .xlsx (openpyxl) or legacy .xls (xlrd)."""
+    if path.lower().endswith(".xls"):
+        import xlrd
+        wb = xlrd.open_workbook(path)
+        for name in wb.sheet_names():
+            sh = wb.sheet_by_name(name)
+            yield name, [[sh.cell_value(r, c) for c in range(sh.ncols)] for r in range(sh.nrows)]
+    else:
+        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+        for name in wb.sheetnames:
+            yield name, [list(row) for row in wb[name].iter_rows(values_only=True)]
+
+
+def parse_contest_sheet(rows):
+    """Parse one contest sheet (list of row-lists). Tolerates the modern XLSX SOV
+    and the legacy .xls (no numbered title prefix; 'Registered'/'Ballots Cast'
+    headers; 'TC-Total' vote types; sometimes no per-precinct Total row)."""
     if len(rows) < 7:
         return None
 
-    # locate the contest title row (first cell containing the numbered prefix in cols A-E)
-    title = None
+    # header row = first row (top ~12) with 'registered' AND ('turnout' or 'cast')
     header_idx = None
-    for i, row in enumerate(rows[:10]):
-        for c in row[:6]:
-            if c and NUM_PREFIX.match(str(c)) and "Registered Voters" not in str(c):
+    for i, row in enumerate(rows[:12]):
+        joined = " ".join(str(c).strip().lower() for c in row if c not in (None, ""))
+        if "registered" in joined and ("turnout" in joined or "cast" in joined):
+            header_idx = i
+            break
+    if header_idx is None:
+        return None
+
+    # title = nearest non-empty cell above the header (skip the county/date banner)
+    title = None
+    for i in range(header_idx - 1, -1, -1):
+        for c in rows[i][:6]:
+            s = str(c).strip() if c is not None else ""
+            if s and not is_label(s) and s.lower() != "alameda county" \
+                    and "statement of vote" not in s.lower():
                 title = clean_contest_name(c)
                 break
-        if title is not None:
-            header_idx = i + 1
+        if title:
             break
-    if title is None or header_idx is None:
+    if not title:
         return None
 
     header = rows[header_idx]
@@ -91,35 +133,54 @@ def parse_contest_sheet(ws):
         if ci < 5 or h is None or str(h).strip() == "":
             continue
         label = str(h).strip()
-        low = label.lower()
-        if low in LABEL_COLS:
+        if is_label(label):
             continue
-        if low in NOVOTE_CHOICES:
+        if label.lower() in NOVOTE_CHOICES:
             novote_cols[ci] = label
         else:
             choice_cols[ci] = label
 
-    data = []
+    # gather data rows per precinct, then reduce to a per-precinct total (explicit
+    # Total row if present, else sum the vote-type rows).
+    from collections import OrderedDict
+    per = OrderedDict()
     for row in rows[header_idx + 1:]:
-        pid = row[0] if len(row) > 0 else None
-        vtype = row[1] if len(row) > 1 else None
-        if pid is None or vtype is None:
+        if len(row) < 2:
             continue
-        pid = str(pid).strip()
+        pid = norm_pid(row[0])
         if not pid.isdigit():
             continue
-        if str(vtype).strip().lower() != "total":
-            continue
-        registered = as_int(row[2]) if len(row) > 2 else 0
-        cast = as_int(row[3]) if len(row) > 3 else 0
-        choices = {name: as_int(row[ci]) if ci < len(row) else 0
-                   for ci, name in choice_cols.items()}
-        over = sum(as_int(row[ci]) for ci, n in novote_cols.items()
-                   if "over" in n.lower() and ci < len(row))
-        under = sum(as_int(row[ci]) for ci, n in novote_cols.items()
-                    if "under" in n.lower() and ci < len(row))
-        data.append({"pid": pid, "registered": registered, "cast": cast,
-                     "choices": choices, "over": over, "under": under})
+        vtype = str(row[1]).strip() if row[1] is not None else ""
+        rec = {"vtype": vtype,
+               "registered": as_int(row[2]) if len(row) > 2 else 0,
+               "cast": as_int(row[3]) if len(row) > 3 else 0,
+               "choices": {name: as_int(row[ci]) if ci < len(row) else 0
+                           for ci, name in choice_cols.items()},
+               "over": sum(as_int(row[ci]) for ci, n in novote_cols.items()
+                           if "over" in n.lower() and ci < len(row)),
+               "under": sum(as_int(row[ci]) for ci, n in novote_cols.items()
+                            if "under" in n.lower() and ci < len(row))}
+        per.setdefault(pid, []).append(rec)
+
+    data = []
+    for pid, recs in per.items():
+        totals = [r for r in recs if "total" in r["vtype"].lower()]
+        if totals:
+            t = totals[-1]
+            data.append({"pid": pid, "registered": t["registered"], "cast": t["cast"],
+                         "choices": t["choices"], "over": t["over"], "under": t["under"]})
+        else:
+            choices = {}
+            for r in recs:
+                for k, v in r["choices"].items():
+                    choices[k] = choices.get(k, 0) + v
+            data.append({"pid": pid,
+                         "registered": max(r["registered"] for r in recs),
+                         "cast": sum(r["cast"] for r in recs),
+                         "choices": choices,
+                         "over": sum(r["over"] for r in recs),
+                         "under": sum(r["under"] for r in recs)})
+
     return {"name": display_name(title), "raw_name": title, "rcv": is_rcv(title),
             "choice_order": [choice_cols[c] for c in sorted(choice_cols)],
             "rows": data}
@@ -128,13 +189,12 @@ def parse_contest_sheet(ws):
 def main():
     sov_path, election_id, out_path, ids_path = sys.argv[1:5]
     berkeley = set(json.load(open(ids_path)))
-    wb = openpyxl.load_workbook(sov_path, read_only=True, data_only=True)
 
     contests = []
-    for sheet in wb.sheetnames:
+    for sheet, rows in load_sheets(sov_path):
         if sheet.lower() == "document map":
             continue
-        parsed = parse_contest_sheet(wb[sheet])
+        parsed = parse_contest_sheet(rows)
         if parsed and parsed["rows"]:
             contests.append(parsed)
 

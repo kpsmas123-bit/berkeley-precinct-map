@@ -33,7 +33,7 @@ build_one() {
   local MAPKEY DGEO FMT
   read -r MAPKEY DGEO FMT < <(meta_of "$EID") || { echo "  [$EID] not in manifest"; return 1; }
   local DMAP="$ROOT/data/district_maps/$MAPKEY.geojson" DGEOP="$ROOT/data/processed/$DGEO"
-  local EXT="xlsx"; [ "$FMT" = "csv" ] && EXT="csv"
+  local EXT="$FMT"   # xlsx | xls | csv
   local PARSER="parse_canvass.py"; [ "$FMT" = "csv" ] && PARSER="parse_sovc_csv.py"
   echo "──────── $EID  (map: $MAPKEY, format: $FMT) ────────"
   bash "$ROOT/ingest/download.sh" "$EID"                                          || { echo "  FAIL download"; return 1; }
