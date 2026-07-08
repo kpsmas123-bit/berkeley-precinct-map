@@ -15,14 +15,13 @@ Format notes (Nov 2024 SOV adapter):
              ("Election Day", "Vote by Mail", "Youth Voting ...", "Total").
              We keep only the per-precinct "Total" row.
 
-Berkeley filter (self-defining, no hardcoded precinct list):
-  Berkeley precincts = union of precinct ids appearing in any contest whose name
-  contains "Berkeley". Every other contest (President, props, county/state...) is
-  then kept only for those precincts, which naturally yields exactly the set of
-  contests that appeared on a Berkeley ballot.
+Berkeley filter:
+  The Berkeley precinct-id set is supplied by build_geo.py (selected spatially, so
+  it works even for primaries with no Berkeley-specific contest). Every contest is
+  kept only for those precincts, which yields exactly the contests on a Berkeley ballot.
 
 Usage:
-  parse_canvass.py <sov.xlsx> <election_id> <out_results.json>
+  parse_canvass.py <sov.xlsx> <election_id> <out_results.json> <berkeley_ids.json>
 """
 import json
 import re
@@ -127,7 +126,8 @@ def parse_contest_sheet(ws):
 
 
 def main():
-    sov_path, election_id, out_path = sys.argv[1], sys.argv[2], sys.argv[3]
+    sov_path, election_id, out_path, ids_path = sys.argv[1:5]
+    berkeley = set(json.load(open(ids_path)))
     wb = openpyxl.load_workbook(sov_path, read_only=True, data_only=True)
 
     contests = []
@@ -138,15 +138,6 @@ def main():
         if parsed and parsed["rows"]:
             contests.append(parsed)
 
-    # Berkeley precinct set = union of precincts in any "Berkeley" contest
-    berkeley = set()
-    for c in contests:
-        if "berkeley" in c["raw_name"].lower():
-            berkeley.update(r["pid"] for r in c["rows"])
-    if not berkeley:
-        print("ERROR: no Berkeley contests found", file=sys.stderr)
-        sys.exit(1)
-
     precincts = {}
     catalog = {}  # contest name -> {rcv, choices, kind}
     for c in contests:
@@ -154,21 +145,28 @@ def main():
         if not keep:
             continue
         kind = "measure" if any(ch.upper() in ("YES", "NO") for ch in c["choice_order"]) else "candidate"
-        catalog[c["name"]] = {"rcv": c["rcv"], "kind": kind, "choices": c["choice_order"]}
+        cat = catalog.setdefault(c["name"], {"rcv": c["rcv"], "kind": kind, "choices": []})
+        # merge choice order across sheets (SOV paginates wide contests across sheets)
+        for ch in c["choice_order"]:
+            if ch not in cat["choices"]:
+                cat["choices"].append(ch)
         for r in keep:
             p = precincts.setdefault(r["pid"], {"registered": 0, "ballots_cast": 0, "contests": {}})
             p["registered"] = max(p["registered"], r["registered"])
             p["ballots_cast"] = max(p["ballots_cast"], r["cast"])  # turnout proxy = top-of-ticket
-            entry = {"choices": r["choices"], "cast": r["cast"]}
+            entry = p["contests"].setdefault(c["name"], {"choices": {}, "cast": 0})
+            for ch, v in r["choices"].items():           # union candidate columns across sheets
+                entry["choices"][ch] = max(entry["choices"].get(ch, 0), v)
+            entry["cast"] = max(entry["cast"], r["cast"])
             if r["over"] or r["under"]:
-                entry["over"], entry["under"] = r["over"], r["under"]
-            p["contests"][c["name"]] = entry
+                entry["over"] = max(entry.get("over", 0), r["over"])
+                entry["under"] = max(entry.get("under", 0), r["under"])
 
     out = {"election_id": election_id, "berkeley_precincts": sorted(berkeley),
            "contests": catalog, "precincts": precincts}
     with open(out_path, "w") as f:
         json.dump(out, f, separators=(",", ":"))
-    print(f"parsed {len(contests)} contests; {len(berkeley)} Berkeley precincts; "
+    print(f"parsed {len(contests)} contest-sheets; {len(berkeley)} Berkeley precincts; "
           f"{len(catalog)} contests on Berkeley ballots -> {out_path}")
 
 

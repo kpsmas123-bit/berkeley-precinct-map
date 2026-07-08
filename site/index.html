@@ -178,8 +178,9 @@ const pickDefaultContest = () => { const n=Object.keys(state.catalog); return n.
 function buildContestPicker(){
   const sel=document.getElementById("contestSel"); sel.innerHTML="";
   const names=Object.keys(state.catalog);
+  const tag=n=>{ const m=state.catalog[n]; return n+(m.rcv?"  (RCV)":"")+(m.verified===false?"  ⚠":""); };
   const grp=(label,arr)=>{ if(!arr.length)return; const og=document.createElement("optgroup"); og.label=label;
-    arr.forEach(n=>og.appendChild(new Option(n+(state.catalog[n].rcv?"  (RCV)":""),n))); sel.appendChild(og); };
+    arr.forEach(n=>og.appendChild(new Option(tag(n),n))); sel.appendChild(og); };
   grp("Berkeley city / schools", names.filter(n=>/Berkeley/.test(n)));
   grp("County · State · Federal · Props", names.filter(n=>!/Berkeley/.test(n)));
   sel.value=state.contest;
@@ -262,7 +263,8 @@ function showDistrict(){
     + (state.district!=="1" ? `<button class="reset" id="resetBtn">↩ back to District 1</button>` : `<span class="mem">focus district</span>`)
     + `</div>`
     + (member?`<div class="vintage">${esc(member)} · boundaries: ${esc(vintage)}</div>`:`<div class="vintage">boundaries: ${esc(vintage)}</div>`)
-    + `<div class="contestTitle"><b>${esc(state.contest)}</b>${cat.rcv?`  ·  <span style="color:#8a5a00">RCV, first-choice only</span>`:""}</div>`;
+    + `<div class="contestTitle"><b>${esc(state.contest)}</b>${cat.rcv?`  ·  <span style="color:#8a5a00">RCV, first-choice only</span>`:""}</div>`
+    + (cat.verified===false?`<div class="noballot" style="color:#8a5a00">⚠ Precinct totals for this contest do not reconcile to the certified canvass — treat as unofficial.</div>`:"");
 
   // district subtotal for the selected contest (across precincts that carry it)
   const sub={}; let carriers=0;

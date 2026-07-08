@@ -2,3 +2,6 @@
 __pycache__/
 *.pyc
 .DS_Store
+
+# large, reproducible via ingest/download.sh
+data/raw/
