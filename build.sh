@@ -22,7 +22,7 @@ import json, os, sys
 eid, root = sys.argv[1], sys.argv[2]
 m = json.load(open(os.path.join(root, "data/processed/elections.json")))
 e = next(x for x in m["elections"] if x["id"] == eid)
-print(e["district_map"], e["districts_geo"])
+print(e["district_map"], e["districts_geo"], e.get("format", "xlsx"))
 PY
 }
 
@@ -30,16 +30,24 @@ build_one() {
   local EID="$1"
   local RAW="$ROOT/data/raw/$EID" RES="$ROOT/data/processed/results/$EID.json" GEO="$ROOT/data/processed/geo/$EID.geojson"
   local IDS="$RAW/berkeley_ids.json"
-  local MAPKEY DGEO
-  read -r MAPKEY DGEO < <(meta_of "$EID") || { echo "  [$EID] not in manifest"; return 1; }
+  local MAPKEY DGEO FMT
+  read -r MAPKEY DGEO FMT < <(meta_of "$EID") || { echo "  [$EID] not in manifest"; return 1; }
   local DMAP="$ROOT/data/district_maps/$MAPKEY.geojson" DGEOP="$ROOT/data/processed/$DGEO"
-  echo "──────── $EID  (map: $MAPKEY) ────────"
+  local EXT="xlsx"; [ "$FMT" = "csv" ] && EXT="csv"
+  local PARSER="parse_canvass.py"; [ "$FMT" = "csv" ] && PARSER="parse_sovc_csv.py"
+  echo "──────── $EID  (map: $MAPKEY, format: $FMT) ────────"
   bash "$ROOT/ingest/download.sh" "$EID"                                          || { echo "  FAIL download"; return 1; }
   "$PY" "$ROOT/ingest/build_geo.py" "$RAW/precincts.geojson" "$DMAP" "$GEO" "$IDS" || { echo "  FAIL geo"; return 1; }
-  "$PY" "$ROOT/ingest/parse_canvass.py" "$RAW/sov.xlsx" "$EID" "$RES" "$IDS"      || { echo "  FAIL parse"; return 1; }
+  "$PY" "$ROOT/ingest/$PARSER" "$RAW/sov.$EXT" "$EID" "$RES" "$IDS"               || { echo "  FAIL parse"; return 1; }
   "$PY" "$ROOT/ingest/assign_districts.py" "$RES" "$GEO" "$DMAP" "$MAPKEY"        || { echo "  FAIL assign"; return 1; }
   "$PY" "$ROOT/ingest/build_districts.py" "$DMAP" "$DGEOP"                        || { echo "  FAIL overlay"; return 1; }
-  "$PY" "$ROOT/ingest/qa.py" "$RAW/district_canvass.xlsx" "$RES"                  || { echo "  ⚠ QA mismatch (see above)"; return 2; }
+  if [ -f "$RAW/district_canvass.xlsx" ]; then
+    "$PY" "$ROOT/ingest/qa.py" "$RAW/district_canvass.xlsx" "$RES"                || { echo "  ⚠ QA mismatch (see above)"; return 2; }
+  else
+    "$PY" - "$RES" <<'PY'
+import json,sys; r=json.load(open(sys.argv[1])); r["qa"]="none"; json.dump(r,open(sys.argv[1],"w"),separators=(",",":")); print("  QA skipped (no certified canvass published)")
+PY
+  fi
   return 0
 }
 

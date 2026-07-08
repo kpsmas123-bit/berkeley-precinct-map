@@ -4,8 +4,24 @@ Static web map showing **precinct-level results** for Berkeley-relevant election
 (~2014–present), with a focus on **City Council District 1**. Python ingestion →
 static JSON/GeoJSON → MapLibre GL JS frontend. No backend.
 
-**Status:** November 2024 General built end-to-end and verified. All 39 Berkeley
-contests reconcile **exactly** against the certified District Canvass (0 discrepancy).
+**Status:** 8 elections built (2018–2024). General elections reconcile **exactly**
+against the certified District Canvass where one was published.
+
+| Election | Format | Precincts | District map | Reconciliation |
+|---|---|---|---|---|
+| 2024-11 General | xlsx | 32 | 2021 | 39/39 exact |
+| 2024-03 Presidential Primary | xlsx | 31 | 2021 | 14 exact, 7 minor-party sub-contests flagged ⚠ |
+| 2022-11 General | xlsx | 31 | 2021 | 46/46 exact (incl. D1 council) |
+| 2022-06 Primary | xlsx | 28 | 2021 | 22/22 exact |
+| 2021-09 Gubernatorial Recall | csv | 32 | 2013 | no canvass published (unreconciled) |
+| 2020-11 General | csv | 32 | 2013 | no canvass published (spot-checked) |
+| 2020-03 Presidential Primary | csv | 75 | 2013 | no canvass published (spot-checked) |
+| 2018-11 General | csv | 106 | 2013 | no canvass; no turnout column in source |
+
+Pre-2020 elections use the county's un-consolidated precincts (many more, smaller);
+COVID all-mail voting consolidated Berkeley to ~30 precincts from Nov 2020 on.
+Adding an election is a manifest entry in `data/processed/elections.json` — the
+canvass format (`xlsx` SOV vs `csv` SOVC) is auto-dispatched.
 
 ## Quick start
 

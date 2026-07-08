@@ -11,15 +11,16 @@ RAW="$ROOT/data/raw/$EID"
 mkdir -p "$RAW"
 PY="$ROOT/.venv/bin/python"; [ -x "$PY" ] || PY="python3"
 
-read -r SOV DC GEO < <("$PY" - "$EID" "$ROOT" <<'PY'
+read -r FMT SOV DC GEO < <("$PY" - "$EID" "$ROOT" <<'PY'
 import json, os, sys
 eid, root = sys.argv[1], sys.argv[2]
 m = json.load(open(os.path.join(root, "data/processed/elections.json")))
 e = next(x for x in m["elections"] if x["id"] == eid)
 s = e["sources"]
-print(s["sov_xlsx"], s["district_canvass_xlsx"], s["precincts_geojson"])
+print(e.get("format", "xlsx"), s["sov"], s.get("district_canvass_xlsx", "-"), s["precincts_geojson"])
 PY
 )
+EXT="xlsx"; [ "$FMT" = "csv" ] && EXT="csv"
 
 # Some acvote/ArcGIS endpoints reject the default curl UA (500) or a missing
 # Referer (403), so send a browser UA + the data hub as Referer on every request.
@@ -38,6 +39,11 @@ fetch() {  # url dest min_bytes label
 }
 
 echo "downloading $EID -> $RAW"
-fetch "$SOV" "$RAW/sov.xlsx"              100000 "sov.xlsx"
-fetch "$DC"  "$RAW/district_canvass.xlsx" 100000 "district_canvass.xlsx"
-fetch "$GEO" "$RAW/precincts.geojson"     10000  "precincts.geojson"
+rm -f "$RAW/sov.xlsx" "$RAW/sov.csv" "$RAW/district_canvass.xlsx"  # avoid stale from a prior format
+fetch "$SOV" "$RAW/sov.$EXT"             20000 "sov.$EXT"
+fetch "$GEO" "$RAW/precincts.geojson"    10000 "precincts.geojson"
+if [ "$DC" != "-" ]; then
+  fetch "$DC" "$RAW/district_canvass.xlsx" 20000 "district_canvass.xlsx"
+else
+  echo "  (no district canvass published for this election)"
+fi

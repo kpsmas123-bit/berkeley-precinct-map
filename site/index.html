@@ -237,7 +237,11 @@ function setHighlights(){
 
 function buildLegend(cmap){
   const el=document.getElementById("legend"); const cat=state.catalog[state.contest];
-  if(state.mode==="turnout") el.innerHTML=`<div style="font-weight:600;margin-bottom:4px">Turnout (ballots / registered)</div>`+gradientBar(["0%","25%","50%","75%","100%"]);
+  if(state.mode==="turnout"){
+    const noTurnout=Object.values(state.results.precincts).every(p=>!p.registered);
+    el.innerHTML=`<div style="font-weight:600;margin-bottom:4px">Turnout (ballots / registered)</div>`
+      + (noTurnout?`<div style="color:#8a5a00">Not published for this election.</div>`:gradientBar(["0%","25%","50%","75%","100%"]));
+  }
   else if(state.mode==="choice") el.innerHTML=`<div style="font-weight:600;margin-bottom:4px">% for ${esc(state.choice)}</div>`+gradientBar(["0%","","50%","","100%"]);
   else el.innerHTML=`<div style="font-weight:600;margin-bottom:4px">Winner${cat.rcv?" (1st choice)":""}</div>`+cat.choices.map(c=>`<div class="row"><span class="sw" style="background:${cmap[c]}"></span>${esc(c)}</div>`).join("");
 }
@@ -288,8 +292,11 @@ function showDistrict(){
   });
 
   const src=(elections.find(e=>e.id===state.election).sources)||{};
-  html+=`<div class="credit">Precinct results: Alameda County ROV Statement of Vote, verified against the certified District Canvass. `
-    + `District lines: ${esc(vintage)}. Districts differ across decades — “District ${esc(d)}” is not comparable across redistricting cycles. `
+  const reconciled = state.results.qa !== "none";
+  html+=`<div class="credit">Precinct results: Alameda County ROV Statement of Vote`
+    + (reconciled ? `, reconciled to the certified District Canvass.`
+                  : ` (SOVC). No certified District Canvass was published for this election, so precinct totals are <b>not independently reconciled</b>.`)
+    + ` District lines: ${esc(vintage)}. Districts differ across decades — “District ${esc(d)}” is not comparable across redistricting cycles. `
     + (src.election_page?`<a class="src" href="${src.election_page}" target="_blank" rel="noopener">source</a>`:"")+`</div>`;
   panel.innerHTML=html;
 

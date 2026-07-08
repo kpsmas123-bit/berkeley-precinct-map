@@ -6,17 +6,16 @@
       "name": "November 5, 2024 General Election",
       "results": "results/2024-11-general.json",
       "geo": "geo/2024-11-general.geojson",
-      "district_map": "berkeley-council-2021",
       "districts_geo": "geo/2024-11-general.districts.geojson",
+      "district_map": "berkeley-council-2021",
       "format": "xlsx",
       "sources": {
-        "sov_xlsx": "https://acvote.alamedacountyca.gov/acvote-assets/02_election_information/SOV/20241105/Statement%20of%20Vote%20-%20General%20Election.xlsx",
+        "sov": "https://acvote.alamedacountyca.gov/acvote-assets/02_election_information/SOV/20241105/Statement%20of%20Vote%20-%20General%20Election.xlsx",
         "district_canvass_xlsx": "https://acvote.alamedacountyca.gov/acvote-assets/02_election_information/SOV/20241105/District%20Canvas%20-%20General%20Election.xlsx",
         "precincts_geojson": "https://opendata.arcgis.com/api/v3/datasets/7c46f7548f8c41d8abb5219faa3b82c6_0/downloads/data?format=geojson&spatialRefId=4326",
-        "dataset_page": "https://data.acgov.org/datasets/7c46f7548f8c41d8abb5219faa3b82c6_0/",
         "election_page": "https://acvote.alamedacountyca.gov/election-information/elections?id=252"
       },
-      "notes": "Berkeley Council District 1 was NOT on this ballot (odd districts + Mayor were up). Mayor and City Council contests are RCV; precinct data is first-choice only."
+      "notes": "Council D1 not on this ballot (odd districts + Mayor). RCV contests are first-choice only."
     },
     {
       "id": "2024-03-primary",
@@ -24,15 +23,16 @@
       "name": "March 5, 2024 Presidential Primary Election",
       "results": "results/2024-03-primary.json",
       "geo": "geo/2024-03-primary.geojson",
-      "district_map": "berkeley-council-2021",
       "districts_geo": "geo/2024-03-primary.districts.geojson",
+      "district_map": "berkeley-council-2021",
       "format": "xlsx",
       "sources": {
-        "sov_xlsx": "https://acvote.alamedacountyca.gov/acvote-assets/02_election_information/SOV/03052024/Statement%20of%20Vote%20Presidential%20Primary%20Election.xlsx",
+        "sov": "https://acvote.alamedacountyca.gov/acvote-assets/02_election_information/SOV/03052024/Statement%20of%20Vote%20Presidential%20Primary%20Election.xlsx",
         "district_canvass_xlsx": "https://acvote.alamedacountyca.gov/acvote-assets/02_election_information/SOV/03052024/District%20Canvas%20Presidential%20Primary%20Election.xlsx",
         "precincts_geojson": "https://opendata.arcgis.com/api/v3/datasets/9f65dab56e3d4a709a8fffd890152e29/downloads/data?format=geojson&spatialRefId=4326",
         "election_page": "https://acvote.alamedacountyca.gov/election-information/elections?id=250"
-      }
+      },
+      "notes": "Some minor-party presidential-preference and party-central-committee sub-contests do not reconcile and are flagged unverified."
     },
     {
       "id": "2022-11-general",
@@ -40,16 +40,16 @@
       "name": "November 8, 2022 General Election",
       "results": "results/2022-11-general.json",
       "geo": "geo/2022-11-general.geojson",
-      "district_map": "berkeley-council-2021",
       "districts_geo": "geo/2022-11-general.districts.geojson",
+      "district_map": "berkeley-council-2021",
       "format": "xlsx",
       "sources": {
-        "sov_xlsx": "https://acvote.alamedacountyca.gov/acvote-assets/02_election_information/SOV/11082022/Statement%20of%20Vote%20General%20Election.xlsx",
+        "sov": "https://acvote.alamedacountyca.gov/acvote-assets/02_election_information/SOV/11082022/Statement%20of%20Vote%20General%20Election.xlsx",
         "district_canvass_xlsx": "https://acvote.alamedacountyca.gov/acvote-assets/02_election_information/SOV/11082022/District%20Canvass%20General%20Election.xlsx",
         "precincts_geojson": "https://opendata.arcgis.com/api/v3/datasets/3d3205bb21904c3db4f8597e1c55cc5e_0/downloads/data?format=geojson&spatialRefId=4326",
         "election_page": "https://acvote.alamedacountyca.gov/election-information/elections?id=249"
       },
-      "notes": "Berkeley Council District 1 (Kesarwani) WAS on this ballot, along with D4/D7/D8 and City Auditor (all RCV, first-choice only)."
+      "notes": "Council District 1 (Kesarwani) WAS on this ballot, along with D4/D7/D8 and City Auditor (all RCV, first-choice only)."
     },
     {
       "id": "2022-06-primary",
@@ -57,15 +57,79 @@
       "name": "June 7, 2022 Direct Primary Election",
       "results": "results/2022-06-primary.json",
       "geo": "geo/2022-06-primary.geojson",
-      "district_map": "berkeley-council-2021",
       "districts_geo": "geo/2022-06-primary.districts.geojson",
+      "district_map": "berkeley-council-2021",
       "format": "xlsx",
       "sources": {
-        "sov_xlsx": "https://acvote.alamedacountyca.gov/acvote-assets/02_election_information/SOV/06072022/sovc_20220607.xlsx",
+        "sov": "https://acvote.alamedacountyca.gov/acvote-assets/02_election_information/SOV/06072022/sovc_20220607.xlsx",
         "district_canvass_xlsx": "https://acvote.alamedacountyca.gov/acvote-assets/02_election_information/SOV/06072022/district_canvass_20220607.xlsx",
         "precincts_geojson": "https://opendata.arcgis.com/api/v3/datasets/e7899e43f98b4bfdae6d970a901a880d_0/downloads/data?format=geojson&spatialRefId=4326",
         "election_page": "https://acvote.alamedacountyca.gov/election-information/elections?id=248"
       }
+    },
+    {
+      "id": "2021-09-recall",
+      "date": "2021-09-14",
+      "name": "September 14, 2021 California Gubernatorial Recall Election",
+      "results": "results/2021-09-recall.json",
+      "geo": "geo/2021-09-recall.geojson",
+      "districts_geo": "geo/2021-09-recall.districts.geojson",
+      "district_map": "berkeley-council-2013",
+      "format": "csv",
+      "sources": {
+        "sov": "https://acvote.alamedacountyca.gov/acvote-assets/02_election_information/PDFs/20210914/Stateofvote09142021.csv",
+        "precincts_geojson": "https://opendata.arcgis.com/api/v3/datasets/23c31d4a0f4347b08c6265ec5d6dbddf_0/downloads/data?format=geojson&spatialRefId=4326",
+        "election_page": "https://acvote.alamedacountyca.gov/election-information/elections?id=245"
+      },
+      "notes": "SOVC CSV; no District Canvass published, so contests are not reconciled against a certified total."
+    },
+    {
+      "id": "2020-11-general",
+      "date": "2020-11-03",
+      "name": "November 3, 2020 General Election",
+      "results": "results/2020-11-general.json",
+      "geo": "geo/2020-11-general.geojson",
+      "districts_geo": "geo/2020-11-general.districts.geojson",
+      "district_map": "berkeley-council-2013",
+      "format": "csv",
+      "sources": {
+        "sov": "https://acvote.alamedacountyca.gov/acvote-assets/pdf/elections/2020/11032020/sovc_20201103.csv",
+        "precincts_geojson": "https://opendata.arcgis.com/api/v3/datasets/364c65861fc044ddb1d250867c9d7e30_0/downloads/data?format=geojson&spatialRefId=4326",
+        "election_page": "https://acvote.alamedacountyca.gov/election-information/elections?id=241"
+      },
+      "notes": "SOVC CSV; District Canvass is PDF-only, so contests are not reconciled here. Mayor + council are RCV, first-choice only."
+    },
+    {
+      "id": "2020-03-primary",
+      "date": "2020-03-03",
+      "name": "March 3, 2020 Presidential Primary Election",
+      "results": "results/2020-03-primary.json",
+      "geo": "geo/2020-03-primary.geojson",
+      "districts_geo": "geo/2020-03-primary.districts.geojson",
+      "district_map": "berkeley-council-2013",
+      "format": "csv",
+      "sources": {
+        "sov": "https://acvote.alamedacountyca.gov/acvote-assets/pdf/elections/2020/sovc_20200303.csv",
+        "precincts_geojson": "https://opendata.arcgis.com/api/v3/datasets/eff0cf8b8fb74f9a8f2e9abf8b7e7249_0/downloads/data?format=geojson&spatialRefId=4326",
+        "election_page": "https://acvote.alamedacountyca.gov/election-information/elections?id=240"
+      },
+      "notes": "SOVC CSV; District Canvass is PDF-only, so contests are not reconciled here."
+    },
+    {
+      "id": "2018-11-general",
+      "date": "2018-11-06",
+      "name": "November 6, 2018 General Election",
+      "results": "results/2018-11-general.json",
+      "geo": "geo/2018-11-general.geojson",
+      "districts_geo": "geo/2018-11-general.districts.geojson",
+      "district_map": "berkeley-council-2013",
+      "format": "csv",
+      "sources": {
+        "sov": "https://acvote.alamedacountyca.gov/acvote-assets/pdf/elections/2018/11062018/results/sovc_20181106.csv",
+        "precincts_geojson": "https://opendata.arcgis.com/api/v3/datasets/5c2a208663ec40d8aa18bfe65ed3a32f/downloads/data?format=geojson&spatialRefId=4326",
+        "election_page": "https://acvote.alamedacountyca.gov/election-information/elections?id=236"
+      },
+      "notes": "SOVC CSV; no District Canvass published, so contests are not reconciled here. Mayor + council (D2/3/5/6) are RCV, first-choice only."
     }
   ]
 }
