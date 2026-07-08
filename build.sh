@@ -65,6 +65,9 @@ while read -r EID; do
   else BAD+=("$EID"); fi
 done <<< "$IDS"
 
+echo "== competitive ballot-measure slots (Feature 3 plumbing) =="
+"$PY" "$ROOT/ingest/build_measures.py"
+
 echo "== stage site data =="
 bash "$ROOT/ingest/stage_site_data.sh"
 

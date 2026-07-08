@@ -7,24 +7,30 @@
 <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <style>
-  :root { --panel: 360px; --bg: #f7f7f5; --ink: #1a1a1a; --muted: #6b6b6b; --line: #e2e2dd; --gold:#e8a400; }
+  :root { --panel: 372px; --bg: #f7f7f5; --ink: #1a1a1a; --muted: #6b6b6b; --line: #e2e2dd; --gold:#e8a400;
+    --below:#d6604d; --above:#4393c3; --neutral:#e8e8e6; }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); }
   #app { display: grid; grid-template-columns: 1fr var(--panel); height: 100%; }
   #map { position: relative; }
   #panel { border-left: 1px solid var(--line); background: #fff; overflow-y: auto; padding: 16px 18px 48px; }
   #controls { position: absolute; top: 12px; left: 12px; z-index: 5; background: rgba(255,255,255,.96);
-    border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; width: 330px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; width: 342px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
   #controls h1 { font-size: 14px; margin: 0 0 2px; letter-spacing: .2px; }
   #controls .sub { font-size: 11px; color: var(--muted); margin-bottom: 10px; }
   label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin: 8px 0 3px; }
   select { width: 100%; padding: 6px 8px; font-size: 13px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
-  .modes { display: flex; gap: 4px; margin-top: 4px; }
-  .modes button { flex: 1; font-size: 12px; padding: 6px 4px; border: 1px solid var(--line); background: #fff; border-radius: 6px; cursor: pointer; }
+  .modes { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .modes button { flex: 1 1 30%; font-size: 12px; padding: 6px 4px; border: 1px solid var(--line); background: #fff; border-radius: 6px; cursor: pointer; }
   .modes button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .toggle { display:flex; gap:4px; margin-top:4px; }
+  .toggle button { flex:1; font-size:12px; padding:5px 4px; border:1px solid var(--line); background:#fff; border-radius:6px; cursor:pointer; }
+  .toggle button.active { background:#e9eef5; border-color:var(--above); color:#1c4a6e; font-weight:600; }
+  .toggle button:disabled { opacity:.4; cursor:not-allowed; }
   #rcvNote { display: none; margin-top: 8px; font-size: 11px; background: #fff7e6; border: 1px solid #f0d9a8; color: #8a5a00; padding: 6px 8px; border-radius: 6px; }
+  .editBtn { margin-top:8px; width:100%; font-size:12px; padding:6px; border:1px dashed var(--line); background:#fafafa; border-radius:6px; cursor:pointer; color:#444; }
   #legend { position: absolute; bottom: 14px; left: 12px; z-index: 5; background: rgba(255,255,255,.96);
-    border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; max-width: 300px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; max-width: 320px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
   #legend .row { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
   #legend .sw { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.15); flex: none; }
   .dhead { display:flex; align-items:baseline; justify-content:space-between; gap:8px; border-bottom:2px solid var(--ink); padding-bottom:6px; margin-bottom:2px; }
@@ -33,6 +39,21 @@
   .vintage { font-size: 11px; color: var(--muted); margin: 4px 0 14px; }
   .reset { font-size: 12px; color:#2a6; cursor:pointer; text-decoration:underline; background:none;border:none;padding:0; }
   .contestTitle { font-size: 14px; margin: 4px 0 2px; }
+  .card { border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin:8px 0 16px; }
+  .card.dev { background:#fbfbf9; } .card.measure { background:#f3f7fb; border-color:#cfe0ee; } .card.align { background:#f7f4fb; border-color:#ddd0ee; }
+  .card .lbl { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin-bottom:6px; }
+  .dvrow { margin:8px 0; }
+  .dvrow .top { display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px; }
+  .dvrow .dev { font-weight:700; font-variant-numeric:tabular-nums; }
+  .dvbar { position:relative; height:10px; background:#ececea; border-radius:3px; }
+  .dvbar .z { position:absolute; left:50%; top:-2px; bottom:-2px; width:1px; background:#9a9a94; }
+  .dvbar .seg { position:absolute; top:0; bottom:0; border-radius:3px; }
+  .mk { display:inline-block; font-size:11px; padding:1px 6px; border-radius:10px; font-weight:600; }
+  .mk.confident { background:#d8efe0; color:#1d7a4d; }
+  .mk.small { background:#fdf0d5; color:#8a5a00; }
+  .mk.noisy { background:#eee; color:#777; }
+  .mk.none { background:#f2f2f0; color:#999; }
+  .mk.flag { background:#fff0f0; color:#b23; }
   .subtotal { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 8px 0 16px; }
   .subtotal .lbl { font-size: 11px; text-transform: uppercase; letter-spacing:.5px; color: var(--muted); margin-bottom: 4px; }
   .prec { margin: 0 0 16px; }
@@ -51,6 +72,17 @@
   .noballot { font-size:12px; color: var(--muted); font-style: italic; margin-top:4px; }
   .credit { font-size: 11px; color: var(--muted); margin-top: 24px; line-height: 1.5; }
   a.src { color: #2a6; }
+  /* editor modal */
+  #editor { position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:20; display:none; align-items:center; justify-content:center; }
+  #editor .box { background:#fff; border-radius:12px; padding:20px 22px; width:460px; max-height:82vh; overflow-y:auto; box-shadow:0 10px 40px rgba(0,0,0,.3); }
+  #editor h3 { margin:0 0 4px; font-size:16px; }
+  #editor .hint { font-size:12px; color:var(--muted); margin-bottom:12px; }
+  #editor .crow { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:5px 0; border-bottom:1px solid var(--line); }
+  #editor .crow span { font-size:13px; }
+  #editor select.score { width:150px; }
+  #editor .btns { display:flex; gap:8px; margin-top:16px; }
+  #editor .btns button { flex:1; padding:8px; border-radius:7px; border:1px solid var(--line); cursor:pointer; font-size:13px; }
+  #editor .btns .primary { background:var(--ink); color:#fff; border-color:var(--ink); }
 </style>
 </head>
 <body>
@@ -66,39 +98,124 @@
       <label>Map mode</label>
       <div class="modes">
         <button data-mode="winner" class="active">Winner</button>
-        <button data-mode="choice">% for choice</button>
+        <button data-mode="choice">% choice</button>
         <button data-mode="turnout">Turnout</button>
+        <button data-mode="deviation">Deviation</button>
+        <button data-mode="alignment">Alignment</button>
       </div>
       <div id="choiceWrap" style="display:none">
         <label>Choice</label>
         <select id="choiceSel"></select>
       </div>
-      <div id="rcvNote">⚑ Ranked-choice contest — precinct data is <b>first-choice only</b>. No precinct-level RCV redistribution exists.</div>
+      <div id="baselineWrap" style="display:none">
+        <label>Deviation vs baseline</label>
+        <div class="toggle" id="baselineToggle">
+          <button data-base="district" class="active">District mean</button>
+          <button data-base="city">Citywide mean</button>
+        </div>
+      </div>
+      <div id="rcvNote">⚑ Ranked-choice contest — precinct data is <b>first-choice only</b>.</div>
+      <button class="editBtn" id="openEditor">✎ Edit alignment scores…</button>
     </div>
     <div id="legend"></div>
   </div>
   <div id="panel"></div>
 </div>
+<div id="editor"><div class="box">
+  <h3>Alignment scores</h3>
+  <div class="hint">1 = strongly oppose · 3 = neutral · 5 = strongly support. “—” = unscored (excluded from the composite). Edits apply live; Export saves <code>alignment.json</code> to commit.</div>
+  <label>Election</label><select id="edElection"></select>
+  <label>Contest</label><select id="edContest"></select>
+  <div id="edChoices"></div>
+  <div class="btns">
+    <button id="edApply" class="primary">Apply</button>
+    <button id="edExport">Export alignment.json</button>
+    <button id="edClose">Close</button>
+  </div>
+</div></div>
 <script>
 const DATA = "./data";
 const CAT = ["#4e79a7","#e15759","#59a14f","#f28e2b","#b07aa1","#76b7b2","#edc948","#9c755f","#bab0ac","#ff9da7"];
 const YESNO = { "YES":"#2b8cbe", "NO":"#e34a33" };
 const RAMP = ["#f7fbff","#c6dbef","#6baed6","#2171b5","#08306b"];
 const MAP_LABEL = { "berkeley-council-2021":"2021 redistricting", "berkeley-council-2013":"2013 map (2010 census)" };
+const MODES = ["winner","choice","turnout","deviation","alignment"];
+const DEV_MAX = 0.15;          // 15 pts saturates the diverging scale
+const MATERIAL = 0.03;         // 3-pt materiality gate
+const NEUTRAL = "#e8e8e6", UNSCORED = "#e6ddc7";
 
-const state = { election:null, contest:null, mode:"winner", choice:null, district:"1", focus:null, results:null, catalog:null, dmembers:{} };
+const state = { election:null, contest:null, mode:"winner", choice:null, baseline:"district",
+                district:"1", focus:null, results:null, catalog:null, dmembers:{},
+                alignment:{}, measures:{} };
 let map, elections;
 
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
 const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const sumv = ch => Object.values(ch).reduce((a,b)=>a+b,0);
 const winnerOf = ch => Object.entries(ch).filter(([k])=>!k.startsWith("_")).reduce((a,b)=> b[1]>a[1]?b:a, ["",-1]);
 const hex2rgb = h => [1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
 function rampColor(t){ const n=RAMP.length-1, x=Math.max(0,Math.min(1,t))*n, i=Math.floor(x), f=x-i;
   const a=hex2rgb(RAMP[i]), b=hex2rgb(RAMP[Math.min(i+1,n)]);
   return `rgb(${a.map((v,k)=>Math.round(v+(b[k]-v)*f)).join(",")})`; }
+// shared diverging scale: t in [-1,1], 0 = neutral gray, <0 below/oppose, >0 above/support
+function divColor(t){
+  t=Math.max(-1,Math.min(1,t));
+  const mid=hex2rgb("e8e8e6"), neg=hex2rgb("d6604d"), pos=hex2rgb("4393c3");
+  const e = t<0?neg:pos, k=Math.abs(t);
+  return `rgb(${mid.map((m,i)=>Math.round(m+(e[i]-m)*k)).join(",")})`;
+}
+
+// ---- statistics (Feature 1) ----
+function aggregate(contest, choice, pids){
+  let cv=0, tv=0;
+  for(const pid of pids){ const c=state.results.precincts[pid]?.contests[contest];
+    if(c){ cv += c.choices[choice]||0; tv += sumv(c.choices); } }
+  return { p: tv? cv/tv : 0, n: tv };
+}
+function districtsWithContest(contest){
+  const s=new Set();
+  for(const p of Object.values(state.results.precincts)) if(p.contests[contest]) s.add(p.district);
+  s.delete(undefined); s.delete(null); return s;
+}
+function leadingChoice(contest){ return winnerOf(aggregate2(contest)); }
+function aggregate2(contest){ const s={}; for(const p of Object.values(state.results.precincts)){ const c=p.contests[contest]; if(c) for(const[k,v] of Object.entries(c.choices)) s[k]=(s[k]||0)+v; } return s; }
+function deviation(pid, contest, choice, baseline){
+  const p0=state.results.precincts[pid], c=p0&&p0.contests[contest];
+  if(!c) return null;
+  const n=sumv(c.choices), p=n?(c.choices[choice]||0)/n:0;
+  const cityOnly = districtsWithContest(contest).size<=1;
+  let base, scope;
+  if(baseline==="city" && !cityOnly){ base=aggregate(contest,choice,Object.keys(state.results.precincts)); scope="city"; }
+  else { base=aggregate(contest,choice, state.results.districts[p0.district]||[]); scope="district"; }
+  const diff=p-base.p;
+  const se=Math.sqrt(p*(1-p)/Math.max(n,1) + base.p*(1-base.p)/Math.max(base.n,1));
+  const sig=Math.abs(diff) > 1.96*se, mat=Math.abs(diff) >= MATERIAL;
+  const verdict = (sig&&mat)?"confident":(sig&&!mat)?"small":(!sig&&mat)?"noisy":"none";
+  return { p, n, base, diff, se, sig, mat, verdict, scope, cityOnly };
+}
+// ---- alignment composite (Feature 2) ----
+function alignmentIndex(pid){
+  const A=state.alignment[state.election]; if(!A) return null;
+  const p=state.results.precincts[pid]; let sum=0, cnt=0;
+  for(const [contest,scores] of Object.entries(A)){
+    const cat=state.catalog[contest]; if(!cat || cat.verified===false) continue;   // honor verified
+    const c=p.contests[contest]; if(!c) continue;
+    const tot=sumv(c.choices); if(!tot) continue;
+    let ws=0, w=0;
+    for(const [choice,score] of Object.entries(scores)){
+      if(score==null) continue;
+      const sh=(c.choices[choice]||0)/tot; ws+=sh*score; w+=sh;
+    }
+    if(w>0){ sum+=ws/w; cnt++; }
+  }
+  return cnt? { index:sum/cnt, contests:cnt } : null;
+}
+window._test = { deviation, alignmentIndex, aggregate, districtsWithContest, get state(){return state;} };
 
 async function boot() {
   elections = (await (await fetch(`${DATA}/elections.json`)).json()).elections;
+  try { state.alignment = await (await fetch(`${DATA}/alignment.json`)).json(); } catch(e){ state.alignment={}; }
+  try { state.measures  = await (await fetch(`${DATA}/measures.json`)).json();  } catch(e){ state.measures={}; }
   const esel = document.getElementById("electionSel");
   elections.forEach(e => esel.add(new Option(e.name, e.id)));
   map = new maplibregl.Map({
@@ -112,16 +229,11 @@ async function boot() {
   map.on("error", e => console.error("MAP ERROR:", e && e.error && e.error.message));
   map.addControl(new maplibregl.NavigationControl({ showCompass:false }), "bottom-right");
   map.on("load", async () => {
-    try {
-      parseHash();
-      esel.value = state.election;
-      await loadElection(state.election);
-      wireControls();
-      window._ready = true;
-    } catch (err) { console.error("LOAD HANDLER FAILED:", err && err.stack || err); }
+    try { parseHash(); document.getElementById("electionSel").value = state.election;
+      await loadElection(state.election); wireControls(); window._ready = true; }
+    catch (err) { console.error("LOAD HANDLER FAILED:", err && err.stack || err); }
   });
 }
-
 function eachCoord(geom, fn){ const walk=a=>{ if(typeof a[0]==="number") fn(a); else a.forEach(walk); }; walk(geom.coordinates); }
 
 async function loadElection(id) {
@@ -141,28 +253,24 @@ async function loadElection(id) {
   map.addSource("districts", { type:"geojson", data:dgeo });
   map.addLayer({ id:"precincts-fill", type:"fill", source:"precincts",
     paint:{ "fill-color":["coalesce",["feature-state","color"],"#ddd"], "fill-opacity":0.82 } });
-  map.addLayer({ id:"precincts-line", type:"line", source:"precincts",
-    paint:{ "line-color":"#fff", "line-width":0.6 } });
-  // group / focus highlight driven by feature-state "sel" (1=in group, 2=focused precinct)
+  map.addLayer({ id:"precincts-line", type:"line", source:"precincts", paint:{ "line-color":"#fff", "line-width":0.6 } });
   map.addLayer({ id:"precincts-sel", type:"line", source:"precincts", paint:{
     "line-color":["case",["==",["feature-state","sel"],2],"#111",["==",["feature-state","sel"],1],"#e8a400","rgba(0,0,0,0)"],
     "line-width":["case",["==",["feature-state","sel"],2],3,["==",["feature-state","sel"],1],1.8,0] } });
   map.addLayer({ id:"districts-all", type:"line", source:"districts",
     paint:{ "line-color":"#888", "line-width":0.8, "line-dasharray":[2,2], "line-opacity":0.5 } });
   map.addLayer({ id:"districts-focus", type:"line", source:"districts",
-    filter:["==",["get","district"], state.district],
-    paint:{ "line-color":"#111", "line-width":2.4 } });
+    filter:["==",["get","district"], state.district], paint:{ "line-color":"#111", "line-width":2.4 } });
 
   const b = new maplibregl.LngLatBounds();
   geo.features.forEach(f => eachCoord(f.geometry, c => b.extend(c)));
-  map.fitBounds(b, { padding:{top:110,left:360,right:40,bottom:60}, duration:0 });
+  map.fitBounds(b, { padding:{top:110,left:372,right:40,bottom:60}, duration:0 });
 
   map.on("click", "precincts-fill", e => {
     const pid = e.features[0].properties.precinct;
     const d = state.results.precincts[pid]?.district;
     if (d==null) return;
-    state.district = d; state.focus = pid;
-    render();
+    state.district = d; state.focus = pid; render();
   });
   map.on("mouseenter","precincts-fill",()=>map.getCanvas().style.cursor="pointer");
   map.on("mouseleave","precincts-fill",()=>map.getCanvas().style.cursor="");
@@ -178,19 +286,21 @@ const pickDefaultContest = () => { const n=Object.keys(state.catalog); return n.
 function buildContestPicker(){
   const sel=document.getElementById("contestSel"); sel.innerHTML="";
   const names=Object.keys(state.catalog);
-  const tag=n=>{ const m=state.catalog[n]; return n+(m.rcv?"  (RCV)":"")+(m.verified===false?"  ⚠":""); };
+  const tag=n=>{ const m=state.catalog[n]; return n+(m.rcv?"  (RCV)":"")+(m.verified===false?"  ⚠":"")+(state.measures[state.election]&&state.measures[state.election][n]?"  ◆":""); };
   const grp=(label,arr)=>{ if(!arr.length)return; const og=document.createElement("optgroup"); og.label=label;
     arr.forEach(n=>og.appendChild(new Option(tag(n),n))); sel.appendChild(og); };
   grp("Berkeley city / schools", names.filter(n=>/Berkeley/.test(n)));
   grp("County · State · Federal · Props", names.filter(n=>!/Berkeley/.test(n)));
   sel.value=state.contest;
 }
+function choiceValid(){ return state.catalog[state.contest].choices.includes(state.choice); }
 function buildChoicePicker(){
   const sel=document.getElementById("choiceSel"); sel.innerHTML="";
   state.catalog[state.contest].choices.forEach(c=>sel.add(new Option(c,c)));
-  if(!state.choice || !state.catalog[state.contest].choices.includes(state.choice)) state.choice=state.catalog[state.contest].choices[0];
+  if(!choiceValid()) state.choice=leadingChoiceName();
   sel.value=state.choice;
 }
+function leadingChoiceName(){ const agg=aggregate2(state.contest); const [w]=winnerOf(agg); return w||state.catalog[state.contest].choices[0]; }
 function colorForContest(){
   const {choices,kind}=state.catalog[state.contest]; const cmap={};
   choices.forEach((c,i)=>{ cmap[c]= kind==="measure"&&YESNO[c.toUpperCase()] ? YESNO[c.toUpperCase()] : CAT[i%CAT.length]; });
@@ -202,10 +312,17 @@ function render(){
   if (state._pendingChoiceSlug){ const m=(state.catalog[state.contest]?.choices||[]).find(c=>slug(c)===state._pendingChoiceSlug); if(m)state.choice=m; state._pendingChoiceSlug=null; }
 
   const cat=state.catalog[state.contest];
+  const usesChoice = state.mode==="choice"||state.mode==="deviation";
   document.getElementById("rcvNote").style.display = cat.rcv?"block":"none";
-  document.getElementById("choiceWrap").style.display = state.mode==="choice"?"block":"none";
+  document.getElementById("choiceWrap").style.display = usesChoice?"block":"none";
+  document.getElementById("baselineWrap").style.display = state.mode==="deviation"?"block":"none";
   document.getElementById("contestSel").value=state.contest;
-  if(state.mode==="choice") buildChoicePicker();
+  if(!choiceValid()) state.choice=leadingChoiceName();
+  if(usesChoice) buildChoicePicker();
+  // city baseline disabled for council-only contests
+  const cityOnly = districtsWithContest(state.contest).size<=1;
+  const cityBtn=document.querySelector('#baselineToggle [data-base="city"]');
+  if(cityBtn){ cityBtn.disabled=cityOnly; if(cityOnly && state.baseline==="city"){ state.baseline="district"; syncBaselineButtons(); } }
 
   paintChoropleth(colorForContest());
   map.setFilter("districts-focus", ["==",["get","district"], state.district]);
@@ -216,36 +333,65 @@ function render(){
 }
 
 function paintChoropleth(cmap){
-  const P=state.results.precincts;
+  const P=state.results.precincts, cat=state.catalog[state.contest];
+  const setC=(pid,color)=>map.setFeatureState({source:"precincts", id:pid}, {color});
+  if(state.mode==="deviation"){
+    const choice=state.choice, dsts=districtsWithContest(state.contest), cityOnly=dsts.size<=1;
+    const cityAgg=aggregate(state.contest,choice,Object.keys(P)); const dAgg={};
+    for(const d of dsts) dAgg[d]=aggregate(state.contest,choice,state.results.districts[d]||[]);
+    for(const [pid,p] of Object.entries(P)){
+      const c=p.contests[state.contest];
+      if(!c || cat.verified===false){ setC(pid, c?NEUTRAL:"#eee"); continue; }
+      const n=sumv(c.choices), pr=n?(c.choices[choice]||0)/n:0;
+      const base=(state.baseline==="city"&&!cityOnly)?cityAgg:dAgg[p.district];
+      const diff=pr-base.p, se=Math.sqrt(pr*(1-pr)/Math.max(n,1)+base.p*(1-base.p)/Math.max(base.n,1));
+      const ok = Math.abs(diff)>1.96*se && Math.abs(diff)>=MATERIAL;
+      setC(pid, ok?divColor(diff/DEV_MAX):NEUTRAL);
+    }
+    return;
+  }
+  if(state.mode==="alignment"){
+    for(const pid of Object.keys(P)){ const ai=alignmentIndex(pid); setC(pid, ai?divColor((ai.index-3)/2):UNSCORED); }
+    return;
+  }
   for(const [pid,p] of Object.entries(P)){
     let color="#e5e5e5";
     if(state.mode==="turnout"){ color=rampColor(p.registered? p.ballots_cast/p.registered:0); }
     else{ const c=p.contests[state.contest];
       if(c){ if(state.mode==="winner"){ const [w]=winnerOf(c.choices); color=cmap[w]||"#bbb"; }
-        else{ const tot=Object.values(c.choices).reduce((a,b)=>a+b,0); color=rampColor(tot?(c.choices[state.choice]||0)/tot:0); } }
+        else{ const tot=sumv(c.choices); color=rampColor(tot?(c.choices[state.choice]||0)/tot:0); } }
       else color="#eee"; }
-    map.setFeatureState({source:"precincts", id:pid}, {color});
+    setC(pid,color);
   }
 }
 function setHighlights(){
   const group=new Set(state.results.districts[state.district]||[]);
-  for(const pid of Object.keys(state.results.precincts)){
-    const sel = pid===state.focus ? 2 : (group.has(pid)?1:0);
-    map.setFeatureState({source:"precincts", id:pid}, {sel});
-  }
+  for(const pid of Object.keys(state.results.precincts))
+    map.setFeatureState({source:"precincts", id:pid}, {sel: pid===state.focus?2:(group.has(pid)?1:0)});
 }
 
 function buildLegend(cmap){
   const el=document.getElementById("legend"); const cat=state.catalog[state.contest];
-  if(state.mode==="turnout"){
+  if(state.mode==="deviation"){
+    const flag = cat.verified===false;
+    el.innerHTML=`<div style="font-weight:600;margin-bottom:4px">Deviation vs ${state.baseline==="city"?"citywide":"district"} mean · ${esc(state.choice)}</div>`
+      + divBar(["−15","below","0","above","+15"])
+      + `<div style="font-size:10px;color:var(--muted);margin-top:3px">Gray = within ±3 pts <b>or</b> not significant (95%). Saturated = passes both gates.</div>`
+      + (flag?`<div class="mk flag" style="margin-top:4px">⚠ unverified — no significance shown</div>`:"");
+  } else if(state.mode==="alignment"){
+    el.innerHTML=`<div style="font-weight:600;margin-bottom:4px">Alignment index (composite)</div>`
+      + divBar(["1 oppose","","3 neutral","","5 support"])
+      + `<div class="row" style="margin-top:4px"><span class="sw" style="background:${UNSCORED}"></span>no scored contests</div>`;
+  } else if(state.mode==="turnout"){
     const noTurnout=Object.values(state.results.precincts).every(p=>!p.registered);
     el.innerHTML=`<div style="font-weight:600;margin-bottom:4px">Turnout (ballots / registered)</div>`
       + (noTurnout?`<div style="color:#8a5a00">Not published for this election.</div>`:gradientBar(["0%","25%","50%","75%","100%"]));
-  }
-  else if(state.mode==="choice") el.innerHTML=`<div style="font-weight:600;margin-bottom:4px">% for ${esc(state.choice)}</div>`+gradientBar(["0%","","50%","","100%"]);
+  } else if(state.mode==="choice") el.innerHTML=`<div style="font-weight:600;margin-bottom:4px">% for ${esc(state.choice)}</div>`+gradientBar(["0%","","50%","","100%"]);
   else el.innerHTML=`<div style="font-weight:600;margin-bottom:4px">Winner${cat.rcv?" (1st choice)":""}</div>`+cat.choices.map(c=>`<div class="row"><span class="sw" style="background:${cmap[c]}"></span>${esc(c)}</div>`).join("");
 }
 const gradientBar=labels=>`<div style="height:12px;border-radius:3px;background:linear-gradient(90deg,${RAMP.join(",")})"></div>`+
+  `<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:2px">`+labels.map(l=>`<span>${l}</span>`).join("")+`</div>`;
+const divBar=labels=>`<div style="height:12px;border-radius:3px;background:linear-gradient(90deg,${divColor(-1)},${NEUTRAL} 50%,${divColor(1)})"></div>`+
   `<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:2px">`+labels.map(l=>`<span>${l}</span>`).join("")+`</div>`;
 
 function resultsTable(choices, cmap, win){
@@ -254,6 +400,59 @@ function resultsTable(choices, cmap, win){
   return `<table class="res">`+entries.map(([name,v])=>{ const pct=tot?100*v/tot:0;
     return `<tr class="${name===win?"win":""}"><td>${esc(name)}<div class="bar"><span style="width:${pct.toFixed(1)}%;background:${cmap[name]||"#999"}"></span></div></td>`+
       `<td class="v">${v.toLocaleString()}</td><td class="p">${pct.toFixed(1)}%</td></tr>`; }).join("")+`</table>`;
+}
+const MK={confident:["confident","significant & material (≥3 pts)"],small:["real but small","significant, &lt;3 pts"],noisy:["noisy","≥3 pts but not significant"],none:["—","no meaningful difference"]};
+function devRow(label, dv){
+  if(!dv) return "";
+  const color=divColor(dv.diff/DEV_MAX), half=Math.max(-1,Math.min(1,dv.diff/DEV_MAX))*50;
+  const left=dv.diff>=0?50:50+half, w=Math.abs(half);
+  const [mk,tip]=MK[dv.verdict];
+  return `<div class="dvrow"><div class="top"><span>${label}</span>`
+    + `<span class="dev" style="color:${dv.verdict==="none"||dv.verdict==="noisy"?"#777":color}">${dv.diff>=0?"+":""}${(dv.diff*100).toFixed(1)} pts</span></div>`
+    + `<div class="dvbar"><span class="z"></span><span class="seg" style="left:${left}%;width:${w}%;background:${color}"></span></div>`
+    + `<div style="margin-top:4px"><span class="mk ${dv.verdict}" title="${tip}">${mk}</span> `
+    + `<span style="font-size:11px;color:var(--muted)">precinct ${(dv.p*100).toFixed(1)}% · baseline ${(dv.base.p*100).toFixed(1)}% · n=${dv.n}</span></div></div>`;
+}
+
+function deviationCard(pid){
+  const cat=state.catalog[state.contest];
+  const c=state.results.precincts[pid].contests[state.contest]; if(!c) return "";
+  const choice = choiceValid()?state.choice:leadingChoiceName();
+  let body;
+  if(cat.verified===false){
+    body=`<div class="mk flag">⚠ unverified contest — deviation shown without significance claims</div>`;
+  } else {
+    const dDist=deviation(pid,state.contest,choice,"district");
+    const cityOnly=districtsWithContest(state.contest).size<=1;
+    const dCity=cityOnly?null:deviation(pid,state.contest,choice,"city");
+    body=devRow("vs council-district mean", dDist)
+       + (dCity?devRow("vs citywide mean", dCity):`<div class="noballot">Council-only contest — no citywide baseline.</div>`);
+  }
+  return `<div class="card dev"><div class="lbl">Deviation · ${esc(choice)} · Precinct ${esc(pid)}</div>${body}</div>`;
+}
+
+function measureCard(){
+  const m=(state.measures[state.election]||{})[state.contest]; if(!m) return "";
+  const pids=state.results.districts[state.district]||[];
+  let yes=0,tot=0; pids.forEach(pid=>{ const c=state.results.precincts[pid].contests[state.contest];
+    if(c){ yes+=c.choices["YES"]||c.choices["Yes"]||0; tot+=sumv(c.choices); } });
+  const distYes = tot? (100*yes/tot).toFixed(1) : "—";
+  const basisNote = m.margin_basis==="jurisdiction" ? "" :
+    ` <span style="color:#8a5a00">(Berkeley-local margin; true ${esc(m.jurisdiction)} margin pending)</span>`;
+  return `<div class="card measure"><div class="lbl">◆ Competitive measure · ${esc(m.jurisdiction)}</div>`
+    + `<div style="font-size:13px;margin-bottom:6px"><b>${m.yes_pct}% YES</b> · margin ${m.final_margin_pct} pts${basisNote}${m.reconciled?"":" · not canvass-reconciled"}</div>`
+    + (m.summary ? `<div style="font-size:13px">${esc(m.summary)}</div>` : `<div class="noballot">Summary pending research (see measures_todo.json).</div>`)
+    + (m.source_url ? `<div style="margin-top:4px"><a class="src" href="${esc(m.source_url)}" target="_blank" rel="noopener">official source</a></div>` : "")
+    + `<div style="font-size:12px;color:var(--muted);margin-top:6px">District ${esc(state.district)} broke <b>${distYes}% YES</b> vs ${m.yes_pct}% jurisdiction.</div></div>`;
+}
+
+function alignmentCard(pid){
+  const ai=alignmentIndex(pid);
+  if(!ai) return `<div class="card align"><div class="lbl">Alignment · Precinct ${esc(pid)}</div><div class="noballot">No scored contests on this precinct’s ballot for ${esc(state.election)}.</div></div>`;
+  const t=(ai.index-3)/2;
+  return `<div class="card align"><div class="lbl">Alignment index · Precinct ${esc(pid)}</div>`
+    + `<div style="font-size:22px;font-weight:700;color:${divColor(t)}">${ai.index.toFixed(2)}<span style="font-size:12px;color:var(--muted);font-weight:400"> / 5 · ${ai.contests} scored contest${ai.contests>1?"s":""}</span></div>`
+    + `<div style="font-size:11px;color:var(--muted)">1 oppose · 3 neutral · 5 support (verified contests only)</div></div>`;
 }
 
 function showDistrict(){
@@ -268,18 +467,21 @@ function showDistrict(){
     + `</div>`
     + (member?`<div class="vintage">${esc(member)} · boundaries: ${esc(vintage)}</div>`:`<div class="vintage">boundaries: ${esc(vintage)}</div>`)
     + `<div class="contestTitle"><b>${esc(state.contest)}</b>${cat.rcv?`  ·  <span style="color:#8a5a00">RCV, first-choice only</span>`:""}</div>`
-    + (cat.verified===false?`<div class="noballot" style="color:#8a5a00">⚠ Precinct totals for this contest do not reconcile to the certified canvass — treat as unofficial.</div>`:"");
+    + (cat.verified===false?`<div class="noballot" style="color:#8a5a00">⚠ Precinct totals for this contest do not reconcile to the certified canvass — excluded from significance claims.</div>`:"");
 
-  // district subtotal for the selected contest (across precincts that carry it)
+  // storytelling cards (Features 1-3)
+  if(state.focus && state.results.precincts[state.focus] && state.results.precincts[state.focus].contests[state.contest]) html+=deviationCard(state.focus);
+  html+=measureCard();
+  if(state.mode==="alignment") html+=alignmentCard(state.focus||pids[0]);
+
+  // district subtotal
   const sub={}; let carriers=0;
   pids.forEach(pid=>{ const c=state.results.precincts[pid].contests[state.contest];
     if(c){ carriers++; for(const [k,v] of Object.entries(c.choices)) sub[k]=(sub[k]||0)+v; } });
-  if(carriers){ const [win]=winnerOf(sub); const tot=Object.values(sub).reduce((a,b)=>a+b,0);
+  if(carriers){ const [win]=winnerOf(sub); const tot=sumv(sub);
     html+=`<div class="subtotal"><div class="lbl">District ${esc(d)} subtotal · ${carriers} precinct${carriers>1?"s":""} · ${tot.toLocaleString()} ${cat.rcv?"first-choice ":""}votes</div>`
       + resultsTable(sub,cmap,win)+`</div>`;
-  } else {
-    html+=`<div class="noballot">“${esc(state.contest)}” was not on the ballot in District ${esc(d)}.</div>`;
-  }
+  } else html+=`<div class="noballot">“${esc(state.contest)}” was not on the ballot in District ${esc(d)}.</div>`;
 
   // per-precinct breakdown
   pids.forEach(pid=>{ const p=state.results.precincts[pid], c=p.contests[state.contest];
@@ -294,9 +496,8 @@ function showDistrict(){
   const src=(elections.find(e=>e.id===state.election).sources)||{};
   const reconciled = state.results.qa !== "none";
   html+=`<div class="credit">Precinct results: Alameda County ROV Statement of Vote`
-    + (reconciled ? `, reconciled to the certified District Canvass.`
-                  : ` (SOVC). No certified District Canvass was published for this election, so precinct totals are <b>not independently reconciled</b>.`)
-    + ` District lines: ${esc(vintage)}. Districts differ across decades — “District ${esc(d)}” is not comparable across redistricting cycles. `
+    + (reconciled ? `, reconciled to the certified District Canvass.` : ` (SOVC). No certified District Canvass was published — precinct totals are <b>not independently reconciled</b>.`)
+    + ` District lines: ${esc(vintage)}. “District ${esc(d)}” is not comparable across redistricting cycles. `
     + (src.election_page?`<a class="src" href="${src.election_page}" target="_blank" rel="noopener">source</a>`:"")+`</div>`;
   panel.innerHTML=html;
 
@@ -315,28 +516,87 @@ function precinctCenter(pid){
   const b=new maplibregl.LngLatBounds(); eachCoord(f.geometry,c=>b.extend(c)); return b.getCenter();
 }
 
+function syncBaselineButtons(){ document.querySelectorAll('#baselineToggle button').forEach(b=>b.classList.toggle("active", b.dataset.base===state.baseline)); }
 function wireControls(){
   document.getElementById("electionSel").onchange=e=>{ state.contest=null; state.district="1"; state.focus=null; loadElection(e.target.value); };
-  document.getElementById("contestSel").onchange=e=>{ state.contest=e.target.value; render(); };
+  document.getElementById("contestSel").onchange=e=>{ state.contest=e.target.value; state.focus=null; render(); };
   document.getElementById("choiceSel").onchange=e=>{ state.choice=e.target.value; render(); };
   document.querySelectorAll(".modes button").forEach(b=> b.onclick=()=>{
     document.querySelectorAll(".modes button").forEach(x=>x.classList.remove("active"));
     b.classList.add("active"); state.mode=b.dataset.mode; render(); });
+  document.querySelectorAll('#baselineToggle button').forEach(b=> b.onclick=()=>{ if(b.disabled)return; state.baseline=b.dataset.base; syncBaselineButtons(); render(); });
+  document.getElementById("openEditor").onclick=openEditor;
+  document.getElementById("edClose").onclick=()=>document.getElementById("editor").style.display="none";
+  document.getElementById("edElection").onchange=fillEditorContests;
+  document.getElementById("edContest").onchange=fillEditorChoices;
+  document.getElementById("edApply").onclick=applyEditor;
+  document.getElementById("edExport").onclick=exportAlignment;
+}
+
+// ---- alignment editor (Feature 2) ----
+function openEditor(){
+  const es=document.getElementById("edElection"); es.innerHTML="";
+  elections.forEach(e=>es.add(new Option(e.name,e.id))); es.value=state.election;
+  fillEditorContests();
+  document.getElementById("editor").style.display="flex";
+}
+async function editorResults(eid){
+  if(eid===state.election) return state.results;
+  const meta=elections.find(e=>e.id===eid);
+  return await (await fetch(`${DATA}/${meta.results}`)).json();
+}
+let _edCatalog={};
+async function fillEditorContests(){
+  const eid=document.getElementById("edElection").value;
+  const r=await editorResults(eid); _edCatalog=r.contests;
+  const cs=document.getElementById("edContest"); cs.innerHTML="";
+  Object.keys(r.contests).forEach(n=>cs.add(new Option(n+(r.contests[n].verified===false?" ⚠":""),n)));
+  fillEditorChoices();
+}
+function fillEditorChoices(){
+  const eid=document.getElementById("edElection").value, contest=document.getElementById("edContest").value;
+  const choices=_edCatalog[contest].choices;
+  const cur=(state.alignment[eid]||{})[contest]||{};
+  const box=document.getElementById("edChoices");
+  box.innerHTML=choices.map(ch=>{
+    const v=cur[ch];
+    const opts=[["","—"],[1,"1 strongly oppose"],[2,"2 oppose"],[3,"3 neutral"],[4,"4 support"],[5,"5 strongly support"]]
+      .map(([val,lab])=>`<option value="${val}" ${String(v??"")===String(val)?"selected":""}>${lab}</option>`).join("");
+    return `<div class="crow"><span>${esc(ch)}</span><select class="score" data-choice="${esc(ch)}">${opts}</select></div>`;
+  }).join("");
+}
+function applyEditor(){
+  const eid=document.getElementById("edElection").value, contest=document.getElementById("edContest").value;
+  const scores={};
+  document.querySelectorAll("#edChoices select.score").forEach(s=>{ if(s.value!=="") scores[s.dataset.choice]=Number(s.value); });
+  state.alignment[eid]=state.alignment[eid]||{};
+  if(Object.keys(scores).length) state.alignment[eid][contest]=scores; else delete state.alignment[eid][contest];
+  if(eid===state.election) render();
+  const btn=document.getElementById("edApply"); btn.textContent="Applied ✓"; setTimeout(()=>btn.textContent="Apply",900);
+}
+function exportAlignment(){
+  const text=JSON.stringify(state.alignment,null,2);
+  const a=document.createElement("a");
+  a.href="data:application/json;charset=utf-8,"+encodeURIComponent(text);
+  a.download="alignment.json"; document.body.appendChild(a); a.click(); a.remove();
 }
 
 function updateHash(){
   const parts=[state.election, slug(state.contest), state.mode];
-  if(state.mode==="choice") parts.push(slug(state.choice));
+  if(state.mode==="choice"||state.mode==="deviation") parts.push(slug(state.choice));
+  if(state.mode==="deviation") parts.push("b-"+state.baseline);
   parts.push("d"+state.district);
   history.replaceState(null,"","#"+parts.join("/"));
 }
 function parseHash(){
   const h=location.hash.replace(/^#/,"").split("/").filter(Boolean);
   state.election=elections.find(e=>e.id===h[0])?.id||elections[0].id;
-  if(h[2]&&["winner","choice","turnout"].includes(h[2])) state.mode=h[2];
+  if(h[2]&&MODES.includes(h[2])) state.mode=h[2];
   document.querySelectorAll(".modes button").forEach(b=>b.classList.toggle("active",b.dataset.mode===state.mode));
-  const dtok=h.find(t=>/^d.+/.test(t)&&t!==h[0]); if(dtok) state.district=dtok.slice(1);
-  state._pendingContestSlug=h[1]; state._pendingChoiceSlug=(state.mode==="choice"?h[3]:null);
+  const btok=h.find(t=>/^b-(district|city)$/.test(t)); if(btok) state.baseline=btok.slice(2);
+  syncBaselineButtons();
+  const dtok=h.find(t=>/^d.+/.test(t)&&t!==h[0]&&!/^b-/.test(t)); if(dtok) state.district=dtok.slice(1);
+  state._pendingContestSlug=h[1]; state._pendingChoiceSlug=((state.mode==="choice"||state.mode==="deviation")?h[3]:null);
 }
 
 boot();

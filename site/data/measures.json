@@ -1,0 +1,73 @@
+{
+  "2024-11-general": {
+    "Proposition 33": {
+      "jurisdiction": "California (statewide)",
+      "margin_basis": "berkeley_subset",
+      "final_margin_pct": 0.5,
+      "yes_pct": 50.3,
+      "reconciled": true,
+      "summary": null,
+      "source_url": null
+    },
+    "Measure EE - City of Berkeley": {
+      "jurisdiction": "City of Berkeley",
+      "margin_basis": "jurisdiction",
+      "final_margin_pct": 8.7,
+      "yes_pct": 45.6,
+      "reconciled": true,
+      "summary": null,
+      "source_url": null
+    }
+  },
+  "2020-11-general": {
+    "State Proposition 23": {
+      "jurisdiction": "California (statewide)",
+      "margin_basis": "berkeley_subset",
+      "final_margin_pct": 1.9,
+      "yes_pct": 50.9,
+      "reconciled": false,
+      "summary": null,
+      "source_url": null
+    },
+    "State Proposition 24": {
+      "jurisdiction": "California (statewide)",
+      "margin_basis": "berkeley_subset",
+      "final_margin_pct": 3.9,
+      "yes_pct": 48.0,
+      "reconciled": false,
+      "summary": null,
+      "source_url": null
+    },
+    "Measure HH - City of Berkeley": {
+      "jurisdiction": "City of Berkeley",
+      "margin_basis": "jurisdiction",
+      "final_margin_pct": 5.5,
+      "yes_pct": 47.2,
+      "reconciled": false,
+      "summary": null,
+      "source_url": null
+    }
+  },
+  "2018-11-general": {
+    "State Proposition 3": {
+      "jurisdiction": "California (statewide)",
+      "margin_basis": "berkeley_subset",
+      "final_margin_pct": 3.5,
+      "yes_pct": 51.7,
+      "reconciled": false,
+      "summary": null,
+      "source_url": null
+    }
+  },
+  "2014-11-general": {
+    "State Proposition 48": {
+      "jurisdiction": "California (statewide)",
+      "margin_basis": "berkeley_subset",
+      "final_margin_pct": 1.6,
+      "yes_pct": 49.2,
+      "reconciled": false,
+      "summary": null,
+      "source_url": null
+    }
+  }
+}
