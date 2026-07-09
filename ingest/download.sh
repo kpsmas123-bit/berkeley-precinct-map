@@ -30,6 +30,9 @@ REFERER="https://data.acgov.org/"
 fetch() {  # url dest min_bytes label
   local url="$1" dest="$2" min="$3" label="$4"
   local code sz
+  if [ -z "${FORCE_DOWNLOAD:-}" ] && [ -s "$dest" ] && [ "$(wc -c < "$dest")" -ge "$min" ]; then
+    echo "  cached $label ($(wc -c < "$dest") bytes)"; return 0
+  fi
   read -r code sz < <(curl -sSL -A "$UA" -e "$REFERER" -o "$dest" -w "%{http_code} %{size_download}\n" "$url")
   if [ "$code" != "200" ] || [ "$sz" -lt "$min" ]; then
     echo "  ERROR $label: http=$code size=$sz (< $min) url=$url" >&2

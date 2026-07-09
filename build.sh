@@ -41,14 +41,16 @@ build_one() {
   "$PY" "$ROOT/ingest/$PARSER" "$RAW/sov.$EXT" "$EID" "$RES" "$IDS"               || { echo "  FAIL parse"; return 1; }
   "$PY" "$ROOT/ingest/assign_districts.py" "$RES" "$GEO" "$DMAP" "$MAPKEY"        || { echo "  FAIL assign"; return 1; }
   "$PY" "$ROOT/ingest/build_districts.py" "$DMAP" "$DGEOP"                        || { echo "  FAIL overlay"; return 1; }
+  local rc=0
   if [ -f "$RAW/district_canvass.xlsx" ]; then
-    "$PY" "$ROOT/ingest/qa.py" "$RAW/district_canvass.xlsx" "$RES"                || { echo "  ⚠ QA mismatch (see above)"; return 2; }
+    "$PY" "$ROOT/ingest/qa.py" "$RAW/district_canvass.xlsx" "$RES" || { echo "  ⚠ QA mismatch (see above)"; rc=2; }
   else
     "$PY" - "$RES" <<'PY'
 import json,sys; r=json.load(open(sys.argv[1])); r["qa"]="none"; json.dump(r,open(sys.argv[1],"w"),separators=(",",":")); print("  QA skipped (no certified canvass published)")
 PY
   fi
-  return 0
+  "$PY" "$ROOT/ingest/annotate_contests.py" "$RES" || echo "  (annotate failed)"
+  return $rc
 }
 
 echo "== fetch council-district maps (both eras) =="
@@ -67,6 +69,9 @@ done <<< "$IDS"
 
 echo "== competitive ballot-measure slots (Feature 3 plumbing) =="
 "$PY" "$ROOT/ingest/build_measures.py"
+
+echo "== featured contests (auto-rank) =="
+"$PY" "$ROOT/ingest/build_featured.py"
 
 echo "== stage site data =="
 bash "$ROOT/ingest/stage_site_data.sh"

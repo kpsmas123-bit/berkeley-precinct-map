@@ -1,0 +1,45 @@
+{
+  "_doc": "Hand-editable curation. Contests here are pinned to the top of the contest picker (per election). Auto-ranked by competitiveness + D1 within-district spread + D1 relevance, gated on consequential+verified. Reorder / add / remove freely; delete this file to regenerate.",
+  "featured": [
+    {
+      "election": "2016-11-general",
+      "contest": "Rent Stabilization Board Commissioners - Berkeley"
+    },
+    {
+      "election": "2014-11-general",
+      "contest": "School Directors - Berkeley"
+    },
+    {
+      "election": "2014-11-general",
+      "contest": "Rent Stabilization Board Commissioners - Berkeley"
+    },
+    {
+      "election": "2024-11-general",
+      "contest": "Mayor - Berkeley"
+    },
+    {
+      "election": "2018-06-primary",
+      "contest": "District Attorney"
+    },
+    {
+      "election": "2018-11-general",
+      "contest": "State Assembly, 15th District"
+    },
+    {
+      "election": "2020-11-general",
+      "contest": "School Directors - Berkeley"
+    },
+    {
+      "election": "2020-11-general",
+      "contest": "Rent Stabilization Board Commissioners - Berkeley"
+    },
+    {
+      "election": "2020-03-primary",
+      "contest": "DEM - County Central Committee  15th Assembly District"
+    },
+    {
+      "election": "2024-11-general",
+      "contest": "Rent Stabilization Board Commissioners - Berkeley"
+    }
+  ]
+}

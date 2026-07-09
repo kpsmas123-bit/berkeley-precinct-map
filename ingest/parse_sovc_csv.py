@@ -68,6 +68,8 @@ def detect_columns(header):
     c["under"] = find_col(header, ["under", "vote"], ["under"])
     c["over"] = find_col(header, ["over", "vote"], ["over"])
     c["ballots"] = find_col(header, ["total", "ballot"], ["ballots", "cast"], ["ballot", "cast"], ["ballot"])
+    # "vote for N" (seats) column: contest_vote_for / VOTES_ALLOWED / selectable_options
+    c["seats"] = find_col(header, ["vote", "for"], ["votes", "allowed"], ["selectable"], ["vote_for"])
     return c
 
 
@@ -116,6 +118,10 @@ def main():
             cat = catalog.setdefault(name, {"rcv": rcv, "kind": None, "choices": []})
             if cand not in cat["choices"]:
                 cat["choices"].append(cand)
+            if c["seats"] is not None:                 # capture max "vote for N" seen
+                s = as_int(row[c["seats"]])
+                if s > cat.get("seats", 0):
+                    cat["seats"] = s
 
     # classify measure vs candidate; drop empty over/under
     for name, cat in catalog.items():

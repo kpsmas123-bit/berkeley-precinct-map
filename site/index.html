@@ -27,6 +27,8 @@
   .toggle button { flex:1; font-size:12px; padding:5px 4px; border:1px solid var(--line); background:#fff; border-radius:6px; cursor:pointer; }
   .toggle button.active { background:#e9eef5; border-color:var(--above); color:#1c4a6e; font-weight:600; }
   .toggle button:disabled { opacity:.4; cursor:not-allowed; }
+  .morebtn { width:100%; margin-top:5px; font-size:11px; padding:3px; background:none; border:none; color:var(--muted); cursor:pointer; text-align:left; }
+  .moreviews { margin-top:3px; }
   #rcvNote { display: none; margin-top: 8px; font-size: 11px; background: #fff7e6; border: 1px solid #f0d9a8; color: #8a5a00; padding: 6px 8px; border-radius: 6px; }
   .editBtn { margin-top:8px; width:100%; font-size:12px; padding:6px; border:1px dashed var(--line); background:#fafafa; border-radius:6px; cursor:pointer; color:#444; }
   #legend { position: absolute; bottom: 14px; left: 12px; z-index: 5; background: rgba(255,255,255,.96);
@@ -97,11 +99,14 @@
       <select id="contestSel"></select>
       <label>Map mode</label>
       <div class="modes">
-        <button data-mode="winner" class="active">Winner</button>
-        <button data-mode="choice">% choice</button>
+        <button data-mode="deviation" class="active">Deviation</button>
         <button data-mode="turnout">Turnout</button>
-        <button data-mode="deviation">Deviation</button>
         <button data-mode="alignment">Alignment</button>
+      </div>
+      <button class="morebtn" id="moreToggle">More views ▾</button>
+      <div class="modes moreviews" id="moreViews" style="display:none">
+        <button data-mode="winner">Winner</button>
+        <button data-mode="choice">% for choice</button>
       </div>
       <div id="choiceWrap" style="display:none">
         <label>Choice</label>
@@ -144,14 +149,18 @@ const DEV_MAX = 0.15;          // 15 pts saturates the diverging scale
 const MATERIAL = 0.03;         // 3-pt materiality gate
 const NEUTRAL = "#e8e8e6", UNSCORED = "#e6ddc7";
 
-const state = { election:null, contest:null, mode:"winner", choice:null, baseline:"district",
+const state = { election:null, contest:null, mode:"deviation", choice:null, baseline:"district",
                 district:"1", focus:null, results:null, catalog:null, dmembers:{},
-                alignment:{}, measures:{} };
+                alignment:{}, measures:{}, featured:[] };
 let map, elections;
 
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
 const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const sumv = ch => Object.values(ch).reduce((a,b)=>a+b,0);
+// multi-seat (vote-for-N) contests: significance must be per-ballot (p=votes/ballots,
+// n=ballots), NOT per-vote — votes within one ballot aren't independent.
+const isMulti = contest => !!(state.catalog[contest] && state.catalog[contest].multi);
+const denomOf = (c, multi) => multi ? (c.cast||0) : sumv(c.choices);
 const winnerOf = ch => Object.entries(ch).filter(([k])=>!k.startsWith("_")).reduce((a,b)=> b[1]>a[1]?b:a, ["",-1]);
 const hex2rgb = h => [1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
 function rampColor(t){ const n=RAMP.length-1, x=Math.max(0,Math.min(1,t))*n, i=Math.floor(x), f=x-i;
@@ -167,10 +176,10 @@ function divColor(t){
 
 // ---- statistics (Feature 1) ----
 function aggregate(contest, choice, pids){
-  let cv=0, tv=0;
+  const multi=isMulti(contest); let cv=0, den=0;
   for(const pid of pids){ const c=state.results.precincts[pid]?.contests[contest];
-    if(c){ cv += c.choices[choice]||0; tv += sumv(c.choices); } }
-  return { p: tv? cv/tv : 0, n: tv };
+    if(c){ cv += c.choices[choice]||0; den += denomOf(c,multi); } }
+  return { p: den? cv/den : 0, n: den };
 }
 function districtsWithContest(contest){
   const s=new Set();
@@ -182,16 +191,18 @@ function aggregate2(contest){ const s={}; for(const p of Object.values(state.res
 function deviation(pid, contest, choice, baseline){
   const p0=state.results.precincts[pid], c=p0&&p0.contests[contest];
   if(!c) return null;
-  const n=sumv(c.choices), p=n?(c.choices[choice]||0)/n:0;
+  const multi=isMulti(contest);
+  const n=denomOf(c,multi), p=n?(c.choices[choice]||0)/n:0;
   const cityOnly = districtsWithContest(contest).size<=1;
   let base, scope;
   if(baseline==="city" && !cityOnly){ base=aggregate(contest,choice,Object.keys(state.results.precincts)); scope="city"; }
   else { base=aggregate(contest,choice, state.results.districts[p0.district]||[]); scope="district"; }
+  if(!n || !base.n) return { unavailable:true, multi, scope, cityOnly };   // multi-seat w/o ballot counts
   const diff=p-base.p;
-  const se=Math.sqrt(p*(1-p)/Math.max(n,1) + base.p*(1-base.p)/Math.max(base.n,1));
+  const se=Math.sqrt(p*(1-p)/n + base.p*(1-base.p)/base.n);   // binomial SE of the difference
   const sig=Math.abs(diff) > 1.96*se, mat=Math.abs(diff) >= MATERIAL;
   const verdict = (sig&&mat)?"confident":(sig&&!mat)?"small":(!sig&&mat)?"noisy":"none";
-  return { p, n, base, diff, se, sig, mat, verdict, scope, cityOnly };
+  return { p, n, base, diff, se, sig, mat, verdict, scope, cityOnly, multi };
 }
 // ---- alignment composite (Feature 2) ----
 function alignmentIndex(pid){
@@ -216,6 +227,7 @@ async function boot() {
   elections = (await (await fetch(`${DATA}/elections.json`)).json()).elections;
   try { state.alignment = await (await fetch(`${DATA}/alignment.json`)).json(); } catch(e){ state.alignment={}; }
   try { state.measures  = await (await fetch(`${DATA}/measures.json`)).json();  } catch(e){ state.measures={}; }
+  try { state.featured  = (await (await fetch(`${DATA}/featured.json`)).json()).featured||[]; } catch(e){ state.featured=[]; }
   const esel = document.getElementById("electionSel");
   elections.forEach(e => esel.add(new Option(e.name, e.id)));
   map = new maplibregl.Map({
@@ -281,16 +293,25 @@ async function loadElection(id) {
   render();
 }
 
-const pickDefaultContest = () => { const n=Object.keys(state.catalog); return n.find(x=>/^Mayor - Berkeley/.test(x))||n[0]; };
+function featuredFor(eid){ return (state.featured||[]).filter(f=>f.election===eid).map(f=>f.contest); }
+const pickDefaultContest = () => {
+  const f=featuredFor(state.election).find(n=>n in state.catalog);
+  if(f) return f;
+  const n=Object.keys(state.catalog); return n.find(x=>/^Mayor - Berkeley/.test(x))||n[0];
+};
 
 function buildContestPicker(){
   const sel=document.getElementById("contestSel"); sel.innerHTML="";
   const names=Object.keys(state.catalog);
-  const tag=n=>{ const m=state.catalog[n]; return n+(m.rcv?"  (RCV)":"")+(m.verified===false?"  ⚠":"")+(state.measures[state.election]&&state.measures[state.election][n]?"  ◆":""); };
-  const grp=(label,arr)=>{ if(!arr.length)return; const og=document.createElement("optgroup"); og.label=label;
-    arr.forEach(n=>og.appendChild(new Option(tag(n),n))); sel.appendChild(og); };
-  grp("Berkeley city / schools", names.filter(n=>/Berkeley/.test(n)));
-  grp("County · State · Federal · Props", names.filter(n=>!/Berkeley/.test(n)));
+  const feat=featuredFor(state.election).filter(n=>names.includes(n)); const featSet=new Set(feat);
+  const tag=n=>{ const m=state.catalog[n];
+    return (m.consequential?"★ ":"")+n+(m.rcv?" (RCV)":"")+(m.multi?" ▦":"")+(m.verified===false?" ⚠":"")+((state.measures[state.election]||{})[n]?" ◆":""); };
+  const opt=n=>{ const o=new Option(tag(n),n); if(state.catalog[n].reason) o.title=state.catalog[n].reason; return o; };
+  const grp=(label,arr)=>{ if(!arr.length)return; const og=document.createElement("optgroup"); og.label=label; arr.forEach(n=>og.appendChild(opt(n))); sel.appendChild(og); };
+  grp("★ Featured", feat);
+  const rest=names.filter(n=>!featSet.has(n));
+  grp("Berkeley city / schools", rest.filter(n=>/Berkeley/.test(n)));
+  grp("County · State · Federal · Props", rest.filter(n=>!/Berkeley/.test(n)));
   sel.value=state.contest;
 }
 function choiceValid(){ return state.catalog[state.contest].choices.includes(state.choice); }
@@ -336,15 +357,16 @@ function paintChoropleth(cmap){
   const P=state.results.precincts, cat=state.catalog[state.contest];
   const setC=(pid,color)=>map.setFeatureState({source:"precincts", id:pid}, {color});
   if(state.mode==="deviation"){
-    const choice=state.choice, dsts=districtsWithContest(state.contest), cityOnly=dsts.size<=1;
+    const choice=state.choice, multi=isMulti(state.contest), dsts=districtsWithContest(state.contest), cityOnly=dsts.size<=1;
     const cityAgg=aggregate(state.contest,choice,Object.keys(P)); const dAgg={};
     for(const d of dsts) dAgg[d]=aggregate(state.contest,choice,state.results.districts[d]||[]);
     for(const [pid,p] of Object.entries(P)){
       const c=p.contests[state.contest];
       if(!c || cat.verified===false){ setC(pid, c?NEUTRAL:"#eee"); continue; }
-      const n=sumv(c.choices), pr=n?(c.choices[choice]||0)/n:0;
+      const n=denomOf(c,multi);
       const base=(state.baseline==="city"&&!cityOnly)?cityAgg:dAgg[p.district];
-      const diff=pr-base.p, se=Math.sqrt(pr*(1-pr)/Math.max(n,1)+base.p*(1-base.p)/Math.max(base.n,1));
+      if(!n || !base.n){ setC(pid, NEUTRAL); continue; }   // multi-seat w/o ballot counts
+      const pr=(c.choices[choice]||0)/n, diff=pr-base.p, se=Math.sqrt(pr*(1-pr)/n+base.p*(1-base.p)/base.n);
       const ok = Math.abs(diff)>1.96*se && Math.abs(diff)>=MATERIAL;
       setC(pid, ok?divColor(diff/DEV_MAX):NEUTRAL);
     }
@@ -359,7 +381,7 @@ function paintChoropleth(cmap){
     if(state.mode==="turnout"){ color=rampColor(p.registered? p.ballots_cast/p.registered:0); }
     else{ const c=p.contests[state.contest];
       if(c){ if(state.mode==="winner"){ const [w]=winnerOf(c.choices); color=cmap[w]||"#bbb"; }
-        else{ const tot=sumv(c.choices); color=rampColor(tot?(c.choices[state.choice]||0)/tot:0); } }
+        else{ const den=denomOf(c,isMulti(state.contest)); color=rampColor(den?(c.choices[state.choice]||0)/den:0); } }
       else color="#eee"; }
     setC(pid,color);
   }
@@ -386,8 +408,10 @@ function buildLegend(cmap){
     const noTurnout=Object.values(state.results.precincts).every(p=>!p.registered);
     el.innerHTML=`<div style="font-weight:600;margin-bottom:4px">Turnout (ballots / registered)</div>`
       + (noTurnout?`<div style="color:#8a5a00">Not published for this election.</div>`:gradientBar(["0%","25%","50%","75%","100%"]));
-  } else if(state.mode==="choice") el.innerHTML=`<div style="font-weight:600;margin-bottom:4px">% for ${esc(state.choice)}</div>`+gradientBar(["0%","","50%","","100%"]);
-  else el.innerHTML=`<div style="font-weight:600;margin-bottom:4px">Winner${cat.rcv?" (1st choice)":""}</div>`+cat.choices.map(c=>`<div class="row"><span class="sw" style="background:${cmap[c]}"></span>${esc(c)}</div>`).join("");
+  } else if(state.mode==="choice") el.innerHTML=`<div style="font-weight:600;margin-bottom:4px">% for ${esc(state.choice)}${cat.multi?" (per ballot)":""}</div>`+gradientBar(["0%","","50%","","100%"]);
+  else { const seatTxt=cat.multi?`Top vote-getter <span style="color:#8a5a00">· multi-seat${cat.seats?", "+cat.seats+" seats":""}</span>`:`Winner`;
+    el.innerHTML=`<div style="font-weight:600;margin-bottom:4px">${seatTxt}${cat.rcv?" (1st choice)":""}</div>`+cat.choices.map(c=>`<div class="row"><span class="sw" style="background:${cmap[c]}"></span>${esc(c)}</div>`).join("")
+      + (cat.multi?`<div style="font-size:10px;color:var(--muted);margin-top:3px">At-large race — color marks the leading vote-getter, not a single winner.</div>`:""); }
 }
 const gradientBar=labels=>`<div style="height:12px;border-radius:3px;background:linear-gradient(90deg,${RAMP.join(",")})"></div>`+
   `<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:2px">`+labels.map(l=>`<span>${l}</span>`).join("")+`</div>`;
@@ -403,7 +427,7 @@ function resultsTable(choices, cmap, win){
 }
 const MK={confident:["confident","significant & material (≥3 pts)"],small:["real but small","significant, &lt;3 pts"],noisy:["noisy","≥3 pts but not significant"],none:["—","no meaningful difference"]};
 function devRow(label, dv){
-  if(!dv) return "";
+  if(!dv || dv.unavailable) return "";
   const color=divColor(dv.diff/DEV_MAX), half=Math.max(-1,Math.min(1,dv.diff/DEV_MAX))*50;
   const left=dv.diff>=0?50:50+half, w=Math.abs(half);
   const [mk,tip]=MK[dv.verdict];
@@ -423,12 +447,17 @@ function deviationCard(pid){
     body=`<div class="mk flag">⚠ unverified contest — deviation shown without significance claims</div>`;
   } else {
     const dDist=deviation(pid,state.contest,choice,"district");
-    const cityOnly=districtsWithContest(state.contest).size<=1;
-    const dCity=cityOnly?null:deviation(pid,state.contest,choice,"city");
-    body=devRow("vs council-district mean", dDist)
-       + (dCity?devRow("vs citywide mean", dCity):`<div class="noballot">Council-only contest — no citywide baseline.</div>`);
+    if(dDist && dDist.unavailable){
+      body=`<div class="noballot">Significance unavailable — per-ballot counts not published for this multi-seat contest.</div>`;
+    } else {
+      const cityOnly=districtsWithContest(state.contest).size<=1;
+      const dCity=cityOnly?null:deviation(pid,state.contest,choice,"city");
+      body=devRow("vs council-district mean", dDist)
+         + (dCity?devRow("vs citywide mean", dCity):`<div class="noballot">Council-only contest — no citywide baseline.</div>`);
+    }
   }
-  return `<div class="card dev"><div class="lbl">Deviation · ${esc(choice)} · Precinct ${esc(pid)}</div>${body}</div>`;
+  const basis=cat.multi?` · per ballot (multi-seat${cat.seats?", "+cat.seats+" seats":""})`:"";
+  return `<div class="card dev"><div class="lbl">Deviation · ${esc(choice)}${basis} · Precinct ${esc(pid)}</div>${body}</div>`;
 }
 
 function measureCard(){
@@ -467,6 +496,8 @@ function showDistrict(){
     + `</div>`
     + (member?`<div class="vintage">${esc(member)} · boundaries: ${esc(vintage)}</div>`:`<div class="vintage">boundaries: ${esc(vintage)}</div>`)
     + `<div class="contestTitle"><b>${esc(state.contest)}</b>${cat.rcv?`  ·  <span style="color:#8a5a00">RCV, first-choice only</span>`:""}</div>`
+    + (cat.multi?`<div class="noballot" style="color:#8a5a00">▦ Multi-seat at-large race${cat.seats?` (${cat.seats} seats)`:""} — rankings are top vote-getters, not a single winner; significance is per-ballot.</div>`:"")
+    + (cat.consequential?`<div style="font-size:11px;color:#1d7a4d;margin-top:2px">★ Consequential — ${esc(cat.reason||"")}</div>`:"")
     + (cat.verified===false?`<div class="noballot" style="color:#8a5a00">⚠ Precinct totals for this contest do not reconcile to the certified canvass — excluded from significance claims.</div>`:"");
 
   // storytelling cards (Features 1-3)
@@ -517,13 +548,17 @@ function precinctCenter(pid){
 }
 
 function syncBaselineButtons(){ document.querySelectorAll('#baselineToggle button').forEach(b=>b.classList.toggle("active", b.dataset.base===state.baseline)); }
+function syncModeButtons(){
+  document.querySelectorAll(".modes button").forEach(b=>b.classList.toggle("active", b.dataset.mode===state.mode));
+  if(["winner","choice"].includes(state.mode)) document.getElementById("moreViews").style.display="flex";
+}
 function wireControls(){
   document.getElementById("electionSel").onchange=e=>{ state.contest=null; state.district="1"; state.focus=null; loadElection(e.target.value); };
   document.getElementById("contestSel").onchange=e=>{ state.contest=e.target.value; state.focus=null; render(); };
   document.getElementById("choiceSel").onchange=e=>{ state.choice=e.target.value; render(); };
-  document.querySelectorAll(".modes button").forEach(b=> b.onclick=()=>{
-    document.querySelectorAll(".modes button").forEach(x=>x.classList.remove("active"));
-    b.classList.add("active"); state.mode=b.dataset.mode; render(); });
+  document.querySelectorAll(".modes button").forEach(b=> b.onclick=()=>{ state.mode=b.dataset.mode; syncModeButtons(); render(); });
+  document.getElementById("moreToggle").onclick=()=>{ const mv=document.getElementById("moreViews");
+    mv.style.display = mv.style.display==="none"?"flex":"none"; };
   document.querySelectorAll('#baselineToggle button').forEach(b=> b.onclick=()=>{ if(b.disabled)return; state.baseline=b.dataset.base; syncBaselineButtons(); render(); });
   document.getElementById("openEditor").onclick=openEditor;
   document.getElementById("edClose").onclick=()=>document.getElementById("editor").style.display="none";
@@ -550,7 +585,8 @@ async function fillEditorContests(){
   const eid=document.getElementById("edElection").value;
   const r=await editorResults(eid); _edCatalog=r.contests;
   const cs=document.getElementById("edContest"); cs.innerHTML="";
-  Object.keys(r.contests).forEach(n=>cs.add(new Option(n+(r.contests[n].verified===false?" ⚠":""),n)));
+  Object.keys(r.contests).forEach(n=>{ const m=r.contests[n];
+    cs.add(new Option((m.consequential?"★ ":"")+n+(m.multi?" ▦":"")+(m.verified===false?" ⚠":""),n)); });
   fillEditorChoices();
 }
 function fillEditorChoices(){
@@ -592,7 +628,7 @@ function parseHash(){
   const h=location.hash.replace(/^#/,"").split("/").filter(Boolean);
   state.election=elections.find(e=>e.id===h[0])?.id||elections[0].id;
   if(h[2]&&MODES.includes(h[2])) state.mode=h[2];
-  document.querySelectorAll(".modes button").forEach(b=>b.classList.toggle("active",b.dataset.mode===state.mode));
+  syncModeButtons();
   const btok=h.find(t=>/^b-(district|city)$/.test(t)); if(btok) state.baseline=btok.slice(2);
   syncBaselineButtons();
   const dtok=h.find(t=>/^d.+/.test(t)&&t!==h[0]&&!/^b-/.test(t)); if(dtok) state.district=dtok.slice(1);
