@@ -100,12 +100,12 @@
       <label>Map mode</label>
       <div class="modes">
         <button data-mode="deviation" class="active">Deviation</button>
-        <button data-mode="turnout">Turnout</button>
-        <button data-mode="alignment">Alignment</button>
+        <button data-mode="winner">Winner</button>
+        <button data-mode="alignment" id="alignBtn" style="display:none">Alignment</button>
       </div>
       <button class="morebtn" id="moreToggle">More views ▾</button>
       <div class="modes moreviews" id="moreViews" style="display:none">
-        <button data-mode="winner">Winner</button>
+        <button data-mode="turnout">Turnout</button>
         <button data-mode="choice">% for choice</button>
       </div>
       <div id="choiceWrap" style="display:none">
@@ -204,24 +204,43 @@ function deviation(pid, contest, choice, baseline){
   const verdict = (sig&&mat)?"confident":(sig&&!mat)?"small":(!sig&&mat)?"noisy":"none";
   return { p, n, base, diff, se, sig, mat, verdict, scope, cityOnly, multi };
 }
-// ---- alignment composite (Feature 2) ----
-function alignmentIndex(pid){
-  const A=state.alignment[state.election]; if(!A) return null;
-  const p=state.results.precincts[pid]; let sum=0, cnt=0;
-  for(const [contest,scores] of Object.entries(A)){
-    const cat=state.catalog[contest]; if(!cat || cat.verified===false) continue;   // honor verified
-    const c=p.contests[contest]; if(!c) continue;
-    const tot=sumv(c.choices); if(!tot) continue;
-    let ws=0, w=0;
-    for(const [choice,score] of Object.entries(scores)){
-      if(score==null) continue;
-      const sh=(c.choices[choice]||0)/tot; ws+=sh*score; w+=sh;
-    }
-    if(w>0){ sum+=ws/w; cnt++; }
-  }
-  return cnt? { index:sum/cnt, contests:cnt } : null;
+// ---- alignment (Feature 2) — human-authored scores only ----
+const contestScored = (eid, contest) => {
+  const s=(state.alignment[eid]||{})[contest];
+  return !!(s && Object.values(s).some(v=>v!=null)) && state.catalog?.[contest]?.verified!==false;
+};
+function scoredContests(eid){
+  const A=state.alignment[eid]||{};
+  return Object.keys(A).filter(n=>Object.values(A[n]||{}).some(v=>v!=null));
 }
-window._test = { deviation, alignmentIndex, aggregate, districtsWithContest, get state(){return state;} };
+// whether an election has ANY scored+verified contest (gates the Alignment button).
+// Needs that election's catalog; for the current election use state.catalog, else
+// treat "has a non-null score" as enough (verified re-checked at render time).
+function hasScored(eid){
+  const A=state.alignment[eid]||{};
+  return Object.entries(A).some(([n,s])=>Object.values(s||{}).some(v=>v!=null));
+}
+// Single-contest alignment index for the CURRENTLY selected contest.
+function contestAlignment(pid, contest){
+  const scores=(state.alignment[state.election]||{})[contest];
+  const cat=state.catalog[contest];
+  if(!scores || !cat || cat.verified===false) return null;      // honor verified
+  const c=state.results.precincts[pid]?.contests[contest]; if(!c) return null;
+  const tot=sumv(c.choices); if(!tot) return null;
+  let ws=0, w=0;
+  for(const [choice,score] of Object.entries(scores)){
+    if(score==null) continue;
+    const sh=(c.choices[choice]||0)/tot; ws+=sh*score; w+=sh;
+  }
+  return w>0 ? ws/w : null;
+}
+function alignmentIndex(pid){
+  const v=contestAlignment(pid, state.contest);
+  return v==null ? null : { index:v, contests:1, contest:state.contest };
+  // TODO: cross-contest precinct alignment average — blend contestAlignment(pid, c)
+  // across scoredContests(state.election) into a per-precinct composite. Not surfaced yet.
+}
+window._test = { deviation, alignmentIndex, contestAlignment, hasScored, scoredContests, aggregate, districtsWithContest, get state(){return state;} };
 
 async function boot() {
   elections = (await (await fetch(`${DATA}/elections.json`)).json()).elections;
@@ -332,6 +351,7 @@ function render(){
   if (state._pendingContestSlug){ const m=Object.keys(state.catalog).find(n=>slug(n)===state._pendingContestSlug); if(m)state.contest=m; state._pendingContestSlug=null; }
   if (state._pendingChoiceSlug){ const m=(state.catalog[state.contest]?.choices||[]).find(c=>slug(c)===state._pendingChoiceSlug); if(m)state.choice=m; state._pendingChoiceSlug=null; }
 
+  updateAlignVisibility();
   const cat=state.catalog[state.contest];
   const usesChoice = state.mode==="choice"||state.mode==="deviation";
   document.getElementById("rcvNote").style.display = cat.rcv?"block":"none";
@@ -460,28 +480,47 @@ function deviationCard(pid){
   return `<div class="card dev"><div class="lbl">Deviation · ${esc(choice)}${basis} · Precinct ${esc(pid)}</div>${body}</div>`;
 }
 
+const thresholdPct = t => t==="two_thirds"?66.667 : t==="55"?55 : t==="majority"?50 : null;
+const thresholdNote = t => t==="two_thirds"?"Needed 2/3 (66.7%) to pass" : t==="55"?"Needed 55% to pass" : t==="majority"?"Simple majority (50%+1) to pass" : null;
+function measurePassed(m){                          // true|false|null; null = threshold unknown
+  if(!m.pass_threshold) return null;
+  return m.pass_threshold==="majority" ? m.yes_pct>50 : m.yes_pct>=thresholdPct(m.pass_threshold);
+}
 function measureCard(){
   const m=(state.measures[state.election]||{})[state.contest]; if(!m) return "";
   const pids=state.results.districts[state.district]||[];
   let yes=0,tot=0; pids.forEach(pid=>{ const c=state.results.precincts[pid].contests[state.contest];
     if(c){ yes+=c.choices["YES"]||c.choices["Yes"]||0; tot+=sumv(c.choices); } });
   const distYes = tot? (100*yes/tot).toFixed(1) : "—";
-  const basisNote = m.margin_basis==="jurisdiction" ? "" :
-    ` <span style="color:#8a5a00">(Berkeley-local margin; true ${esc(m.jurisdiction)} margin pending)</span>`;
-  return `<div class="card measure"><div class="lbl">◆ Competitive measure · ${esc(m.jurisdiction)}</div>`
-    + `<div style="font-size:13px;margin-bottom:6px"><b>${m.yes_pct}% YES</b> · margin ${m.final_margin_pct} pts${basisNote}${m.reconciled?"":" · not canvass-reconciled"}</div>`
-    + (m.summary ? `<div style="font-size:13px">${esc(m.summary)}</div>` : `<div class="noballot">Summary pending research (see measures_todo.json).</div>`)
+  const label = m.local ? "Local measure" : "Competitive measure";
+  const star = m.competitive ? ` · <span style="color:#1d7a4d">★ competitive</span>` : "";
+  // threshold + pass/fail — only for LOCAL measures (jurisdiction result; a Berkeley
+  // subset of a statewide prop can't be pass/failed from local data).
+  let passLine="";
+  if(m.local){
+    if(!m.pass_threshold) passLine=`<div style="margin:5px 0"><span class="mk none">threshold pending</span></div>`;
+    else { const passed=measurePassed(m);
+      passLine=`<div style="margin:5px 0"><span class="mk ${passed?'confident':'flag'}">${passed?'PASSED':'FAILED'}</span> <span style="font-size:11px;color:var(--muted)">· ${esc(thresholdNote(m.pass_threshold))}</span></div>`; }
+  }
+  const basisNote = m.local ? "" : ` <span style="color:#8a5a00">· Berkeley share only; true ${esc(m.jurisdiction)} result differs</span>`;
+  return `<div class="card measure"><div class="lbl">◆ ${label} · ${esc(m.jurisdiction)}${star}</div>`
+    + `<div style="font-size:13px;margin-bottom:2px"><b>${m.yes_pct}% YES</b> ${m.local?"jurisdiction-wide":"in Berkeley"} · margin ${m.final_margin_pct} pts${basisNote}${m.reconciled?"":" · not canvass-reconciled"}</div>`
+    + passLine
+    + (m.summary ? `<div style="font-size:13px;margin-top:4px">${esc(m.summary)}</div>` : `<div class="noballot">Summary pending research (see measures_todo.json).</div>`)
     + (m.source_url ? `<div style="margin-top:4px"><a class="src" href="${esc(m.source_url)}" target="_blank" rel="noopener">official source</a></div>` : "")
-    + `<div style="font-size:12px;color:var(--muted);margin-top:6px">District ${esc(state.district)} broke <b>${distYes}% YES</b> vs ${m.yes_pct}% jurisdiction.</div></div>`;
+    + `<div style="font-size:12px;color:var(--muted);margin-top:6px">District ${esc(state.district)} broke <b>${distYes}% YES</b> vs ${m.yes_pct}% ${m.local?"citywide":"(Berkeley)"}.</div></div>`;
 }
 
 function alignmentCard(pid){
+  const scored=contestScored(state.election, state.contest);
+  if(!scored) return `<div class="card align"><div class="lbl">Alignment · Precinct ${esc(pid)}</div>`
+    + `<div class="noballot">“${esc(state.contest)}” has no alignment scores yet. Add them with “✎ Edit alignment scores…”.</div></div>`;
   const ai=alignmentIndex(pid);
-  if(!ai) return `<div class="card align"><div class="lbl">Alignment · Precinct ${esc(pid)}</div><div class="noballot">No scored contests on this precinct’s ballot for ${esc(state.election)}.</div></div>`;
+  if(!ai) return `<div class="card align"><div class="lbl">Alignment · Precinct ${esc(pid)}</div><div class="noballot">Not on this precinct’s ballot.</div></div>`;
   const t=(ai.index-3)/2;
-  return `<div class="card align"><div class="lbl">Alignment index · Precinct ${esc(pid)}</div>`
-    + `<div style="font-size:22px;font-weight:700;color:${divColor(t)}">${ai.index.toFixed(2)}<span style="font-size:12px;color:var(--muted);font-weight:400"> / 5 · ${ai.contests} scored contest${ai.contests>1?"s":""}</span></div>`
-    + `<div style="font-size:11px;color:var(--muted)">1 oppose · 3 neutral · 5 support (verified contests only)</div></div>`;
+  return `<div class="card align"><div class="lbl">Alignment · ${esc(state.contest)} · Precinct ${esc(pid)}</div>`
+    + `<div style="font-size:22px;font-weight:700;color:${divColor(t)}">${ai.index.toFixed(2)}<span style="font-size:12px;color:var(--muted);font-weight:400"> / 5</span></div>`
+    + `<div style="font-size:11px;color:var(--muted)">1 oppose · 3 neutral · 5 support · single contest (verified)</div></div>`;
 }
 
 function showDistrict(){
@@ -550,13 +589,26 @@ function precinctCenter(pid){
 function syncBaselineButtons(){ document.querySelectorAll('#baselineToggle button').forEach(b=>b.classList.toggle("active", b.dataset.base===state.baseline)); }
 function syncModeButtons(){
   document.querySelectorAll(".modes button").forEach(b=>b.classList.toggle("active", b.dataset.mode===state.mode));
-  if(["winner","choice"].includes(state.mode)) document.getElementById("moreViews").style.display="flex";
+  if(["turnout","choice"].includes(state.mode)) document.getElementById("moreViews").style.display="flex";
+}
+// Alignment button shows only when the current election has a human-scored contest.
+function updateAlignVisibility(){
+  const has=hasScored(state.election);
+  document.getElementById("alignBtn").style.display = has ? "" : "none";
+  if(!has && state.mode==="alignment") state.mode="deviation";
+  syncModeButtons();
 }
 function wireControls(){
   document.getElementById("electionSel").onchange=e=>{ state.contest=null; state.district="1"; state.focus=null; loadElection(e.target.value); };
   document.getElementById("contestSel").onchange=e=>{ state.contest=e.target.value; state.focus=null; render(); };
   document.getElementById("choiceSel").onchange=e=>{ state.choice=e.target.value; render(); };
-  document.querySelectorAll(".modes button").forEach(b=> b.onclick=()=>{ state.mode=b.dataset.mode; syncModeButtons(); render(); });
+  document.querySelectorAll(".modes button").forEach(b=> b.onclick=()=>{
+    state.mode=b.dataset.mode;
+    if(state.mode==="alignment" && !contestScored(state.election, state.contest)){
+      const sc=scoredContests(state.election).filter(n=>n in state.catalog && state.catalog[n].verified!==false);
+      if(sc.length) state.contest=sc[0];
+    }
+    syncModeButtons(); render(); });
   document.getElementById("moreToggle").onclick=()=>{ const mv=document.getElementById("moreViews");
     mv.style.display = mv.style.display==="none"?"flex":"none"; };
   document.querySelectorAll('#baselineToggle button').forEach(b=> b.onclick=()=>{ if(b.disabled)return; state.baseline=b.dataset.base; syncBaselineButtons(); render(); });

@@ -1,26 +1,32 @@
 #!/usr/bin/env python3
 """
-Feature 3 plumbing (DATA STUB — no summaries are written here). Scan every
-election's parsed results for ballot measures / propositions / recalls, compute the
-jurisdiction-level final margin from the certified totals we have, and emit a slot
-(summary: null) for the COMPETITIVE ones (margin < 10 pts, i.e. result ~45-55%).
+Feature 3 plumbing (DATA STUB — no summaries or thresholds are written here). Scan
+every election's parsed results for ballot measures / propositions / recalls and emit
+a slot in measures.json.
 
-We only hold Berkeley precinct data, so:
-  - City of Berkeley / Berkeley USD measures: Berkeley IS the jurisdiction, and for
-    reconciled (verified) elections the precinct sum equals the certified canvass —
-    margin_basis "jurisdiction" (a true jurisdiction margin).
-  - County / statewide / recall contests: we only have Berkeley's share, so the
-    margin is a Berkeley-local proxy — margin_basis "berkeley_subset" (the true
-    jurisdiction margin must be looked up externally; flagged in the todo queue).
+Scope (Fix 3):
+  - EVERY LOCAL measure (City of Berkeley / Berkeley USD / Berkeley-specific district)
+    gets a slot regardless of margin — the user wants a description for each.
+  - County / statewide / recall contests get a slot only when COMPETITIVE (margin
+    < 10 pts) and are flagged margin_basis "berkeley_subset" (Berkeley-local proxy;
+    the true jurisdiction margin must be pulled externally).
 
-Unverified contests (verified == false) are skipped — no margin claims on unreliable
-totals. Existing summaries/source_urls in measures.json are preserved (merge).
+`competitive` (margin < 10 pts, jurisdiction basis) is stored as a SEPARATE flag for
+the star/featured logic — it no longer gates whether a description slot exists.
+
+Pass/fail (Fix 4): `pass_threshold` (majority | 55 | two_thirds | null) and
+`threshold_note` are RESEARCHED per measure and must NOT be inferred from the name —
+left null here. yes_pct is stored so the frontend can compute pass/fail once a
+threshold is supplied.
+
+Unverified contests are skipped. Existing summary / source_url / pass_threshold /
+threshold_note in measures.json are preserved (merge).
 
 Outputs (merged across all elections):
-  data/processed/measures.json       competitive measures -> {summary, jurisdiction, ...}
-  data/processed/measures_todo.json  the research queue (qualifying + unsummarized)
+  data/processed/measures.json       election -> contest -> {summary, jurisdiction, ...}
+  data/processed/measures_todo.json  research queue (local measures missing summary or threshold)
 
-Usage: build_measures.py            (reads every election in the manifest)
+Usage: build_measures.py
 """
 import json
 import os
@@ -46,7 +52,10 @@ def jurisdiction_of(name):
         return "California (statewide)", "berkeley_subset"
     if "recall" in low:
         return "recall (jurisdiction varies)", "berkeley_subset"
-    return "Berkeley (local)", "jurisdiction"
+    # regional / special districts (AC Transit, EBMUD, BART, East Bay Regional Park,
+    # SF Bay Restoration, Peralta/Chabot CCD, ...) span many cities — Berkeley is a
+    # subset, not the jurisdiction.
+    return "regional / other district", "berkeley_subset"
 
 
 def yes_no(precincts, contest):
@@ -69,8 +78,7 @@ def main():
     mpath = os.path.join(PROC, "measures.json")
     existing = json.load(open(mpath)) if os.path.exists(mpath) else {}
 
-    out = {}
-    todo = []
+    out, todo = {}, []
     for e in manifest:
         eid = e["id"]
         rp = os.path.join(PROC, e["results"])
@@ -79,46 +87,55 @@ def main():
         results = json.load(open(rp))
         precincts = results["precincts"]
         for name, meta in results["contests"].items():
-            if meta.get("kind") != "measure":
+            if meta.get("kind") != "measure" or not IS_MEASURE.search(name) or NOT_MEASURE.search(name):
                 continue
-            if not IS_MEASURE.search(name) or NOT_MEASURE.search(name):
-                continue
-            if meta.get("verified") is False:          # honor verified: no claims on bad totals
+            if meta.get("verified") is False:
                 continue
             yes, no = yes_no(precincts, name)
             tot = yes + no
             if tot == 0:
                 continue
             margin = 100.0 * abs(yes - no) / tot
-            if margin >= COMPETITIVE_PCT:
-                continue
+            yes_pct = 100.0 * yes / tot
             juris, basis = jurisdiction_of(name)
+            local = basis == "jurisdiction"
+            competitive = margin < COMPETITIVE_PCT
+            if not (local or competitive):        # county/state only when competitive
+                continue
             prev = existing.get(eid, {}).get(name, {})
             out.setdefault(eid, {})[name] = {
                 "jurisdiction": juris,
                 "margin_basis": basis,
+                "local": local,
+                "competitive": bool(competitive),
                 "final_margin_pct": round(margin, 1),
-                "yes_pct": round(100.0 * yes / tot, 1),
+                "yes_pct": round(yes_pct, 1),
                 "reconciled": results.get("qa") != "none" and meta.get("verified") is True,
                 "summary": prev.get("summary"),
                 "source_url": prev.get("source_url"),
+                "pass_threshold": prev.get("pass_threshold"),   # majority | 55 | two_thirds | null (researched)
+                "threshold_note": prev.get("threshold_note"),
             }
-            if not out[eid][name]["summary"]:
+            if local and (not out[eid][name]["summary"] or not out[eid][name]["pass_threshold"]):
                 todo.append({"election": eid, "contest": name, "jurisdiction": juris,
-                             "margin_basis": basis, "final_margin_pct": round(margin, 1),
-                             "yes_pct": round(100.0 * yes / tot, 1)})
+                             "yes_share": round(yes_pct, 1), "margin": round(margin, 1),
+                             "summary": out[eid][name]["summary"],
+                             "pass_threshold": out[eid][name]["pass_threshold"]})
 
     json.dump(out, open(mpath, "w"), indent=2)
-    todo.sort(key=lambda x: (x["margin_basis"] != "jurisdiction", x["final_margin_pct"]))
-    json.dump({"note": "Competitive ballot measures (<10pt margin) still needing a "
-                       "verified summary. 'berkeley_subset' margins are Berkeley-local "
-                       "proxies — verify the true jurisdiction margin before summarizing.",
+    todo.sort(key=lambda x: (x["election"], x["contest"]))
+    json.dump({"note": "Research queue: every LOCAL Berkeley measure still missing a "
+                       "summary and/or a pass_threshold. pass_threshold is one of "
+                       "majority | 55 | two_thirds and MUST be read from the measure text "
+                       "(general vs special tax), not guessed. Fill summary + pass_threshold "
+                       "in measures.json; rebuild preserves them.",
                "count": len(todo), "queue": todo},
               open(os.path.join(PROC, "measures_todo.json"), "w"), indent=2)
 
     n = sum(len(v) for v in out.values())
-    print(f"measures: {n} competitive slots across {len(out)} elections; "
-          f"{len(todo)} still need summaries -> measures.json, measures_todo.json")
+    nl = sum(1 for v in out.values() for m in v.values() if m["local"])
+    print(f"measures: {n} slots ({nl} local, {n - nl} competitive county/state) across "
+          f"{len(out)} elections; {len(todo)} local measures need summary/threshold")
 
 
 if __name__ == "__main__":
