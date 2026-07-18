@@ -8,7 +8,7 @@
 <script src="./vendor/maplibre-gl.js"></script>
 <style>
   :root { --panel: 372px; --bg: #f7f7f5; --ink: #1a1a1a; --muted: #6b6b6b; --line: #e2e2dd; --gold:#e8a400;
-    --below:#d6604d; --above:#4393c3; --neutral:#e8e8e6; }
+    --below:#b35806; --above:#2166ac; --neutral:#e8e8e6; }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); }
   #app { display: grid; grid-template-columns: 1fr var(--panel); height: 100%; }
@@ -219,12 +219,13 @@ const hex2rgb = h => [1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
 function rampColor(t){ const n=RAMP.length-1, x=Math.max(0,Math.min(1,t))*n, i=Math.floor(x), f=x-i;
   const a=hex2rgb(RAMP[i]), b=hex2rgb(RAMP[Math.min(i+1,n)]);
   return `rgb(${a.map((v,k)=>Math.round(v+(b[k]-v)*f)).join(",")})`; }
-// shared diverging scale: t in [-1,1], 0 = neutral gray. Blue = above, orange = below —
-// a colorblind-safe, non-partisan pair (avoids US red/blue party connotations).
+// shared diverging scale: t in [-1,1]. Light neutral midpoint, dark saturated
+// endpoints, orange↔blue — the canonical colorblind-safe, non-partisan diverging pair
+// (ColorBrewer / Cynthia Brewer: light middle, dark contrasting-hue extremes).
 function divColor(t){
   t=Math.max(-1,Math.min(1,t));
-  const mid=hex2rgb("e8e8e6"), neg=hex2rgb("e08214"), pos=hex2rgb("4393c3");
-  const e = t<0?neg:pos, k=Math.abs(t);
+  const mid=[241,241,239], below=[179,88,6], above=[33,102,172];   // #b35806 <-> #f1f1ef <-> #2166ac
+  const e = t<0?below:above, k=Math.abs(t);
   return `rgb(${mid.map((m,i)=>Math.round(m+(e[i]-m)*k)).join(",")})`;
 }
 
@@ -319,8 +320,7 @@ async function boot() {
   map = new maplibregl.Map({
     container: "map",
     style: { version:8,
-      glyphs:"https://basemaps.cartocdn.com/gl/positron-gl-style/glyphs/{fontstack}/{range}.pbf",
-      sources:{ carto:{ type:"raster", tiles:["https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"], tileSize:256, attribution:"© OpenStreetMap © CARTO" } },
+      sources:{ carto:{ type:"raster", tiles:["https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png","https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png","https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"], tileSize:256, attribution:"© OpenStreetMap © CARTO" } },
       layers:[{ id:"base", type:"raster", source:"carto" }] },
     center:[-122.29,37.884], zoom:12.4 });
   window._map = map;
@@ -341,12 +341,16 @@ async function boot() {
 }
 function eachCoord(geom, fn){ const walk=a=>{ if(typeof a[0]==="number") fn(a); else a.forEach(walk); }; walk(geom.coordinates); }
 function fitToPrecincts(duration){
-  if(!state._geo) return;
+  if(!state._geo || !state._geo.features.length) return;
   const b=new maplibregl.LngLatBounds();
   state._geo.features.forEach(f=>eachCoord(f.geometry,c=>b.extend(c)));
+  if(b.isEmpty()) return;
   const narrow = window.innerWidth<=760;
   const pad = narrow ? {top:96,left:20,right:20,bottom:40} : {top:110,left:372,right:40,bottom:60};
-  map.fitBounds(b, { padding:pad, duration: duration==null?400:duration });
+  const doFit=()=>{ try{ map.fitBounds(b, { padding:pad, duration: duration==null?400:duration }); }
+    catch(e){ /* container not sized yet — retry after resize */ map.once("idle", ()=>{ try{ map.fitBounds(b,{padding:pad,duration:0}); }catch(_){} }); } };
+  // guard against a not-yet-laid-out container (fitBounds → NaN)
+  const c=map.getCanvas(); if(c && c.width>0 && c.height>0) doFit(); else map.once("idle", doFit);
 }
 
 async function loadElection(id) {
@@ -366,7 +370,7 @@ async function loadElection(id) {
   map.addSource("precincts", { type:"geojson", data:geo, promoteId:"precinct" });
   map.addSource("districts", { type:"geojson", data:dgeo });
   map.addLayer({ id:"precincts-fill", type:"fill", source:"precincts",
-    paint:{ "fill-color":["coalesce",["feature-state","color"],"#ddd"], "fill-opacity":0.82 } });
+    paint:{ "fill-color":["coalesce",["feature-state","color"],"#ddd"], "fill-opacity":0.88 } });
   map.addLayer({ id:"precincts-line", type:"line", source:"precincts", paint:{ "line-color":"#fff", "line-width":0.6 } });
   map.addLayer({ id:"precincts-sel", type:"line", source:"precincts", paint:{
     "line-color":["case",["==",["feature-state","sel"],2],"#111",["==",["feature-state","sel"],1],"#e8a400","rgba(0,0,0,0)"],
