@@ -88,6 +88,9 @@
   /* per-precinct rows as real, keyboard-focusable buttons (a11y) */
   .prec .ph { width:100%; text-align:left; font:inherit; color:inherit; background:none; border:none; border-radius:6px; }
   .prec .ph:focus-visible { outline:2px solid var(--above); outline-offset:2px; }
+  .distrow { display:block; width:100%; text-align:left; font:inherit; color:inherit; background:none; border:none; border-bottom:1px solid var(--line); padding:8px 2px; cursor:pointer; }
+  .distrow:hover .pid { text-decoration:underline; }
+  .distrow:focus-visible { outline:2px solid var(--above); outline-offset:2px; }
   /* about / intro overlay */
   #about { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:30; display:none; align-items:center; justify-content:center; padding:16px; }
   #about .box { background:#fff; border-radius:12px; padding:22px 24px; max-width:520px; max-height:86vh; overflow-y:auto; box-shadow:0 12px 44px rgba(0,0,0,.3); }
@@ -122,7 +125,7 @@
     <button id="aboutBtn" title="About this map" aria-label="About this map">ⓘ</button>
     <div id="controls">
       <h1>Berkeley Precinct Election Map</h1>
-      <div class="sub" id="focusNote">Click any precinct to jump to its council district. Default: District&nbsp;1.</div>
+      <div class="sub" id="focusNote">Precinct-level results across Berkeley. Click any precinct or district for detail.</div>
       <label>Election</label>
       <select id="electionSel"></select>
       <label>Contest</label>
@@ -160,10 +163,9 @@
 </div>
 <div id="about"><div class="box">
   <h2>Berkeley precinct election results, 2014–2024</h2>
-  <p>Each shape is a <b>voting precinct</b>. Pick an <b>election</b> and a <b>contest</b>, then color the
-  map by <b>who won</b>, <b>turnout</b>, or a candidate's <b>share</b>. Click any precinct for its full
-  results table. The map is focused on <b>City Council District&nbsp;1</b> (outlined), but you can click
-  into any district.</p>
+  <p>Each shape is a <b>voting precinct</b> in Berkeley. Pick an <b>election</b> and a <b>contest</b>, then
+  color the map by <b>who won</b>, <b>turnout</b>, or a candidate's <b>share</b>. Click any precinct or
+  council district for its full results table.</p>
   <p style="font-weight:600;margin-bottom:2px">A few things to know:</p>
   <ul>
     <li><b>Gray precincts</b> mean the contest <b>wasn't on that ballot</b> — not zero votes.</li>
@@ -201,7 +203,7 @@ const MATERIAL = 0.03;         // 3-pt materiality gate
 const NEUTRAL = "#e8e8e6", UNSCORED = "#e6ddc7";
 
 const state = { election:null, contest:null, mode:"winner", choice:null, baseline:"district",
-                district:"1", focus:null, results:null, catalog:null, dmembers:{},
+                district:null, focus:null, results:null, catalog:null, dmembers:{},
                 alignment:{}, measures:{}, featured:[] };
 let map, elections;
 
@@ -333,8 +335,9 @@ async function boot() {
     catch (err) { console.error("LOAD HANDLER FAILED:", err && err.stack || err); fatal("Something went wrong loading the map. Please refresh."); }
   }
   map.on("load", init);
-  // resilience: if the basemap tiles stall, still start once the style is ready
-  setTimeout(()=>{ if(!inited && map.isStyleLoaded()) init(); }, 2500);
+  // resilience: start as soon as the style is ready even if basemap tiles stall/are blocked
+  let _t=0; const _poll=setInterval(()=>{ if(inited || _t++>25){ clearInterval(_poll); return; }
+    if(map.isStyleLoaded()) init(); }, 400);
 }
 function eachCoord(geom, fn){ const walk=a=>{ if(typeof a[0]==="number") fn(a); else a.forEach(walk); }; walk(geom.coordinates); }
 function fitToPrecincts(duration){
@@ -389,7 +392,7 @@ async function loadElection(id) {
 
   buildContestPicker();
   if (!state.contest || !(state.contest in state.catalog)) state.contest = pickDefaultContest();
-  if (!(state.district in state.results.districts)) { state.district = "1"; state.focus = null; }
+  if (state.district!=null && !(state.district in state.results.districts)) { state.district = null; state.focus = null; }
   render();
 }
 
@@ -446,9 +449,13 @@ function render(){
   const cityBtn=document.querySelector('#baselineToggle [data-base="city"]');
   if(cityBtn){ cityBtn.disabled=cityOnly; if(cityOnly && state.baseline==="city"){ state.baseline="district"; syncBaselineButtons(); } }
 
-  paintChoropleth(colorForContest());
-  map.setFilter("districts-focus", ["==",["get","district"], state.district]);
-  setHighlights();
+  const paintMap=()=>{ try{
+    paintChoropleth(colorForContest());
+    map.setFilter("districts-focus", ["==",["get","district"], state.district||"__none__"]);
+    setHighlights();
+  }catch(e){ console.error("paint skipped:", e && e.message); } };
+  if(map.isStyleLoaded() && map.getSource("precincts")) paintMap();
+  else map.once("idle", paintMap);   // repaint once the style/tiles settle (resilient to flaky CDNs)
   buildLegend(colorForContest());
   showDistrict();
   updateHash();
@@ -590,7 +597,8 @@ function measureCard(){
     + passLine
     + (m.summary ? `<div style="font-size:13px;margin-top:4px">${esc(m.summary)}</div>` : ``)
     + (m.source_url ? `<div style="margin-top:4px"><a class="src" href="${esc(m.source_url)}" target="_blank" rel="noopener">official source</a></div>` : "")
-    + `<div style="font-size:12px;color:var(--muted);margin-top:6px">District ${esc(state.district)} broke <b>${distYes}% YES</b> vs ${m.yes_pct}% ${m.local?"citywide":"(Berkeley)"}.</div></div>`;
+    + (state.district?`<div style="font-size:12px;color:var(--muted);margin-top:6px">District ${esc(state.district)} broke <b>${distYes}% YES</b> vs ${m.yes_pct}% ${m.local?"citywide":"(Berkeley)"}.</div>`:``)
+    + `</div>`;
 }
 
 function alignmentCard(pid){
@@ -605,7 +613,54 @@ function alignmentCard(pid){
     + `<div style="font-size:11px;color:var(--muted)">1 oppose · 3 neutral · 5 support · single contest (verified)</div></div>`;
 }
 
+function contestNotesHtml(cat){
+  return `<div class="contestTitle"><b>${esc(state.contest)}</b>${cat.rcv?`  ·  <span style="color:#8a5a00">RCV, first-choice only</span>`:""}</div>`
+    + (cat.multi?`<div class="noballot" style="color:#8a5a00">▦ At-large race${cat.seats?` (${cat.seats} seats)`:""} — voters could pick several candidates, so this shows the top vote-getters, not one winner.</div>`:"")
+    + (cat.consequential?`<div style="font-size:11px;color:#1d7a4d;margin-top:2px">★ Competitive race — ${esc(cat.reason||"")}</div>`:"")
+    + (cat.verified===false?`<div class="noballot" style="color:#8a5a00">⚠ These precinct totals don't match the certified county total — shown for reference, not used for comparisons.</div>`:"");
+}
+function creditHtml(vintage){
+  const src=(elections.find(e=>e.id===state.election).sources)||{};
+  const reconciled = state.results.qa !== "none";
+  return `<div class="credit">Precinct results: Alameda County Registrar of Voters`
+    + (reconciled ? `, checked against the certified county District Canvass.` : ` — these totals were <b>not checked against a certified county total</b> (this election had no precinct canvass).`)
+    + ` District lines: ${esc(vintage)}. Districts cover a different area before vs. after the 2021 redistricting. `
+    + (src.election_page?`<a class="src" href="${src.election_page}" target="_blank" rel="noopener">source</a>`:"")+`</div>`;
+}
+function showCitywide(){
+  const panel=document.getElementById("panel");
+  const cat=state.catalog[state.contest], cmap=colorForContest();
+  const vintage=MAP_LABEL[state.results.district_map]||state.results.district_map;
+  const P=state.results.precincts;
+  let html=`<div class="dhead"><h2>Berkeley — citywide</h2><span class="mem">all precincts · click a district or precinct</span></div>`
+    + `<div class="vintage">boundaries: ${esc(vintage)}</div>`
+    + contestNotesHtml(cat);
+  html+=measureCard();
+  // citywide subtotal
+  const sub={}; let carriers=0;
+  for(const p of Object.values(P)){ const c=p.contests[state.contest]; if(c){ carriers++; for(const [k,v] of Object.entries(c.choices)) sub[k]=(sub[k]||0)+v; } }
+  if(carriers){ const [win]=winnerOf(sub); const tot=sumv(sub);
+    html+=`<div class="subtotal"><div class="lbl">Citywide · ${carriers} precinct${carriers>1?"s":""} · ${tot.toLocaleString()} ${cat.rcv?"first-choice ":""}votes</div>`+resultsTable(sub,cmap,win)+`</div>`;
+  } else html+=`<div class="noballot">“${esc(state.contest)}” had no votes in Berkeley precincts.</div>`;
+  // per-district breakdown (clickable)
+  const dists=Object.keys(state.results.districts).sort((a,b)=>(+a)-(+b));
+  html+=`<div class="subtotal-lbl" style="text-transform:uppercase;font-size:11px;letter-spacing:.5px;color:var(--muted);margin:2px 0 2px">By council district — click to drill in</div>`;
+  dists.forEach(d=>{
+    const pids=state.results.districts[d]||[]; const agg={};
+    pids.forEach(pid=>{ const c=P[pid].contests[state.contest]; if(c) for(const [k,v] of Object.entries(c.choices)) agg[k]=(agg[k]||0)+v; });
+    const tot=sumv(agg); const mem=state.dmembers[d];
+    let right=`<span style="color:var(--muted)">not on ballot</span>`;
+    if(tot){ const [w,wv]=winnerOf(agg); right=`${esc(w)} · ${(100*wv/tot).toFixed(0)}%`; }
+    html+=`<button class="ph distrow" data-d="${esc(d)}" type="button" aria-label="District ${esc(d)} details">`
+      + `<span class="pid">District ${esc(d)}</span>${mem?` <span style="font-size:11px;color:var(--muted)">${esc(mem)}</span>`:""}`
+      + `<span style="float:right;font-size:12px">${right}</span></button>`;
+  });
+  html+=creditHtml(vintage);
+  panel.innerHTML=html;
+  panel.querySelectorAll(".distrow").forEach(el=> el.onclick=()=>{ state.district=el.dataset.d; state.focus=null; render(); });
+}
 function showDistrict(){
+  if(!state.district) return showCitywide();
   const panel=document.getElementById("panel");
   const cat=state.catalog[state.contest], cmap=colorForContest();
   const d=state.district, member=state.dmembers[d];
@@ -613,13 +668,10 @@ function showDistrict(){
   const vintage=MAP_LABEL[state.results.district_map]||state.results.district_map;
 
   let html=`<div class="dhead"><h2>District ${esc(d)}</h2>`
-    + (state.district!=="1" ? `<button class="reset" id="resetBtn">↩ back to District 1</button>` : `<span class="mem">focus district</span>`)
+    + `<button class="reset" id="resetBtn">↩ citywide</button>`
     + `</div>`
     + (member?`<div class="vintage">${esc(member)} · boundaries: ${esc(vintage)}</div>`:`<div class="vintage">boundaries: ${esc(vintage)}</div>`)
-    + `<div class="contestTitle"><b>${esc(state.contest)}</b>${cat.rcv?`  ·  <span style="color:#8a5a00">RCV, first-choice only</span>`:""}</div>`
-    + (cat.multi?`<div class="noballot" style="color:#8a5a00">▦ At-large race${cat.seats?` (${cat.seats} seats)`:""} — voters could pick several candidates, so this shows the top vote-getters, not one winner.</div>`:"")
-    + (cat.consequential?`<div style="font-size:11px;color:#1d7a4d;margin-top:2px">★ Competitive race — ${esc(cat.reason||"")}</div>`:"")
-    + (cat.verified===false?`<div class="noballot" style="color:#8a5a00">⚠ These precinct totals don't match the certified county total — shown for reference, not used for comparisons.</div>`:"");
+    + contestNotesHtml(cat);
 
   // storytelling cards (Features 1-3)
   if(state.focus && state.results.precincts[state.focus] && state.results.precincts[state.focus].contests[state.contest]) html+=deviationCard(state.focus);
@@ -645,16 +697,11 @@ function showDistrict(){
     html+=`</div>`;
   });
 
-  const src=(elections.find(e=>e.id===state.election).sources)||{};
-  const reconciled = state.results.qa !== "none";
-  html+=`<div class="credit">Precinct results: Alameda County Registrar of Voters`
-    + (reconciled ? `, checked against the certified county District Canvass.` : ` — these totals were <b>not checked against a certified county total</b> (this election had no precinct canvass).`)
-    + ` District lines: ${esc(vintage)}. “District ${esc(d)}” covers a different area before vs. after the 2021 redistricting. `
-    + (src.election_page?`<a class="src" href="${src.election_page}" target="_blank" rel="noopener">source</a>`:"")+`</div>`;
+  html+=creditHtml(vintage);
   panel.innerHTML=html;
 
   const rb=document.getElementById("resetBtn");
-  if(rb) rb.onclick=()=>{ state.district="1"; state.focus=null; render(); };
+  if(rb) rb.onclick=()=>{ state.district=null; state.focus=null; render(); };
   panel.querySelectorAll(".prec").forEach(el=> el.querySelector(".ph").onclick=()=>{
     state.focus=el.dataset.pid; render();
     map.flyTo({center: precinctCenter(el.dataset.pid), duration:500, zoom: Math.max(map.getZoom(),13)});
@@ -680,7 +727,7 @@ function updateAlignVisibility(){
   syncModeButtons();
 }
 function wireControls(){
-  document.getElementById("electionSel").onchange=e=>{ state.contest=null; state.district="1"; state.focus=null;
+  document.getElementById("electionSel").onchange=e=>{ state.contest=null; state.district=null; state.focus=null;
     loadElection(e.target.value).catch(err=>{ console.error(err); fatal("Could not load that election. Please refresh."); }); };
   document.getElementById("resetView").onclick=fitToPrecincts;
   const about=document.getElementById("about");
@@ -760,7 +807,7 @@ function updateHash(){
   const parts=[state.election, slug(state.contest), state.mode];
   if(state.mode==="choice"||state.mode==="deviation") parts.push(slug(state.choice));
   if(state.mode==="deviation") parts.push("b-"+state.baseline);
-  parts.push("d"+state.district);
+  if(state.district) parts.push("d"+state.district);
   history.replaceState(null,"","#"+parts.join("/"));
 }
 function parseHash(){

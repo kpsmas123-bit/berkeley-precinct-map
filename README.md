@@ -1,7 +1,7 @@
 # Berkeley Precinct Election Map
 
 Static web map showing **precinct-level results** for Berkeley-relevant elections
-(~2014–present), with a focus on **City Council District 1**. Python ingestion →
+(2014–present), citywide across all council districts. Python ingestion →
 static JSON/GeoJSON → MapLibre GL JS frontend. No backend.
 
 **Status:** all 13 post-2014 elections built (2014–2024). Where the county

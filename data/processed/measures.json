@@ -21,10 +21,10 @@
       "final_margin_pct": 21.9,
       "yes_pct": 60.9,
       "reconciled": true,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Amends the real-property transfer tax, raising rates on high-value sales and removing its sunset.",
+      "source_url": "https://berkeleyca.gov/sites/default/files/documents/2024-12-10%20Special%20Item%2001%20Confirming%20the%20Results.pdf",
+      "pass_threshold": "majority",
+      "threshold_note": "General tax; City certification 'Majority Vote Required.'"
     },
     "Measure X - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -34,10 +34,10 @@
       "final_margin_pct": 57.1,
       "yes_pct": 78.5,
       "reconciled": true,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Creates a special parcel tax to fund Berkeley Public Library facilities and services.",
+      "source_url": "https://berkeleyca.gov/sites/default/files/documents/2024-12-10%20Special%20Item%2001%20Confirming%20the%20Results.pdf",
+      "pass_threshold": "two_thirds",
+      "threshold_note": "Government-placed special parcel tax; City certification 'Two-thirds Vote Required.'"
     },
     "Measure Y - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -47,10 +47,10 @@
       "final_margin_pct": 50.4,
       "yes_pct": 75.2,
       "reconciled": true,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Increases the special parcel tax rate for parks, trees, and landscaping maintenance.",
+      "source_url": "https://berkeleyca.gov/sites/default/files/documents/2024-12-10%20Special%20Item%2001%20Confirming%20the%20Results.pdf",
+      "pass_threshold": "two_thirds",
+      "threshold_note": "Government-placed special parcel tax; City certification 'Two-thirds Vote Required.'"
     },
     "Measure Z - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -60,10 +60,10 @@
       "final_margin_pct": 59.8,
       "yes_pct": 79.9,
       "reconciled": true,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Removes the expiration date on Berkeley's general sugar-sweetened-beverage tax.",
+      "source_url": "https://berkeleyca.gov/sites/default/files/documents/2024-12-10%20Special%20Item%2001%20Confirming%20the%20Results.pdf",
+      "pass_threshold": "majority",
+      "threshold_note": "General tax; City certification 'Majority Vote Required.'"
     },
     "Measure AA - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -73,10 +73,10 @@
       "final_margin_pct": 77.5,
       "yes_pct": 88.7,
       "reconciled": true,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Raises the Gann appropriations limit to spend existing tax proceeds, FY2025\u20132028.",
+      "source_url": "https://berkeleyca.gov/sites/default/files/documents/2024-12-10%20Special%20Item%2001%20Confirming%20the%20Results.pdf",
+      "pass_threshold": "majority",
+      "threshold_note": "Appropriations-limit authorization, not a tax; City certification 'Majority Vote Required.'"
     },
     "Measure BB - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -86,10 +86,10 @@
       "final_margin_pct": 12.0,
       "yes_pct": 56.0,
       "reconciled": true,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Amends the rent stabilization ordinance on eviction grounds, rent caps, and tenant associations.",
+      "source_url": "https://berkeleyca.gov/sites/default/files/documents/2024-12-10%20Special%20Item%2001%20Confirming%20the%20Results.pdf",
+      "pass_threshold": "majority",
+      "threshold_note": "Ordinance amendment; City certification 'Majority Vote Required.'"
     },
     "Measure CC - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -99,10 +99,10 @@
       "final_margin_pct": 30.0,
       "yes_pct": 35.0,
       "reconciled": true,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Competing rent measure creating direct rental payments and amending the rent ordinance.",
+      "source_url": "https://berkeleyca.gov/sites/default/files/documents/2024-12-10%20Special%20Item%2001%20Confirming%20the%20Results.pdf",
+      "pass_threshold": "majority",
+      "threshold_note": "Ordinance amendment; City certification 'Majority Vote Required.'"
     },
     "Measure DD - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -112,10 +112,10 @@
       "final_margin_pct": 23.8,
       "yes_pct": 61.9,
       "reconciled": true,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Prohibits establishing or expanding concentrated animal feeding operations in Berkeley.",
+      "source_url": "https://berkeleyca.gov/sites/default/files/documents/2024-12-10%20Special%20Item%2001%20Confirming%20the%20Results.pdf",
+      "pass_threshold": "majority",
+      "threshold_note": "Regulatory ordinance, not a tax; City certification 'Majority Vote Required.'"
     },
     "Measure EE - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -125,10 +125,10 @@
       "final_margin_pct": 8.7,
       "yes_pct": 45.6,
       "reconciled": true,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Competing measure creating a 12-year special parcel tax for street and sidewalk repairs.",
+      "source_url": "https://berkeleyca.gov/sites/default/files/documents/2024-12-10%20Special%20Item%2001%20Confirming%20the%20Results.pdf",
+      "pass_threshold": "majority",
+      "threshold_note": "Voter-initiative special tax (Upland) \u2014 majority; City certification 'Majority Vote Required.'"
     },
     "Measure FF - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -138,10 +138,10 @@
       "final_margin_pct": 21.7,
       "yes_pct": 60.9,
       "reconciled": true,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Creates a 14-year special parcel tax for street, sidewalk, and pedestrian-path repairs.",
+      "source_url": "https://berkeleyca.gov/sites/default/files/documents/2024-12-10%20Special%20Item%2001%20Confirming%20the%20Results.pdf",
+      "pass_threshold": "majority",
+      "threshold_note": "Voter-initiative special tax (Upland) \u2014 majority; City certification 'Majority Vote Required.'"
     },
     "Measure GG - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -151,10 +151,10 @@
       "final_margin_pct": 38.0,
       "yes_pct": 31.0,
       "reconciled": true,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Would tax natural-gas use in large buildings to fund building decarbonization.",
+      "source_url": "https://berkeleyca.gov/sites/default/files/documents/2024-12-10%20Special%20Item%2001%20Confirming%20the%20Results.pdf",
+      "pass_threshold": "majority",
+      "threshold_note": "Citizen-initiative special tax (Upland) \u2014 majority; City certification 'Majority Vote Required.'"
     },
     "Measure HH - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -164,10 +164,10 @@
       "final_margin_pct": 13.1,
       "yes_pct": 43.4,
       "reconciled": true,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Requires minimum indoor air-quality standards for city-owned and city-leased buildings.",
+      "source_url": "https://berkeleyca.gov/sites/default/files/documents/2024-12-10%20Special%20Item%2001%20Confirming%20the%20Results.pdf",
+      "pass_threshold": "majority",
+      "threshold_note": "Ordinance, not a tax; City certification 'Majority Vote Required.'"
     }
   },
   "2024-03-primary": {
@@ -179,10 +179,10 @@
       "final_margin_pct": 76.5,
       "yes_pct": 88.3,
       "reconciled": true,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Renews Berkeley schools' BSEP special parcel tax for staffing, programs, and libraries.",
+      "source_url": "https://ballotpedia.org/Berkeley_Unified_School_District,_California,_Measure_H,_Parcel_Tax_Measure_(March_2024)",
+      "pass_threshold": "two_thirds",
+      "threshold_note": "School special parcel tax (BSEP) \u2014 two-thirds."
     }
   },
   "2022-11-general": {
@@ -194,10 +194,10 @@
       "final_margin_pct": 29.9,
       "yes_pct": 64.9,
       "reconciled": true,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Annual tax on long-vacant residential units, with revenue to the general fund.",
+      "source_url": "https://ballotpedia.org/Berkeley,_California,_Measure_M,_Vacant_Residential_Property_Tax_Measure_(November_2022)",
+      "pass_threshold": "majority",
+      "threshold_note": "General tax (unrestricted general fund) \u2014 majority."
     },
     "Measure N - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -207,10 +207,10 @@
       "final_margin_pct": 52.3,
       "yes_pct": 76.1,
       "reconciled": true,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Authorized public agencies to develop up to 3,000 units of low-rent housing.",
+      "source_url": "https://ballotpedia.org/Berkeley,_California,_Measure_N,_Low-Rent_Housing_Measure_(November_2022)",
+      "pass_threshold": "majority",
+      "threshold_note": "Article XXXIV public-housing authorization \u2014 majority."
     }
   },
   "2020-11-general": {
@@ -248,10 +248,10 @@
       "final_margin_pct": 48.7,
       "yes_pct": 74.4,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Special parcel tax funding firefighting, emergency medical response, and wildfire prevention.",
+      "source_url": "https://www.lwvbae.org/wp-content/uploads/2020/08/Berkeley-Measures-20-11.pdf",
+      "pass_threshold": "two_thirds",
+      "threshold_note": "Government-placed special parcel tax; ballot label 'Needs 2/3 vote to pass.'"
     },
     "Measure GG - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -261,10 +261,10 @@
       "final_margin_pct": 17.7,
       "yes_pct": 58.9,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Tax on Uber/Lyft trips originating in Berkeley for general municipal services.",
+      "source_url": "https://www.lwvbae.org/wp-content/uploads/2020/08/Berkeley-Measures-20-11.pdf",
+      "pass_threshold": "majority",
+      "threshold_note": "General tax (any municipal purpose); ballot label 'Majority vote.'"
     },
     "Measure HH - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -274,10 +274,10 @@
       "final_margin_pct": 5.5,
       "yes_pct": 47.2,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Proposed raising the utility-users tax on electricity and gas from 7.5% to 10%.",
+      "source_url": "https://www.lwvbae.org/wp-content/uploads/2020/08/Berkeley-Measures-20-11.pdf",
+      "pass_threshold": "majority",
+      "threshold_note": "General tax for general services; ballot label 'Majority vote required.'"
     },
     "Measure II - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -287,10 +287,10 @@
       "final_margin_pct": 69.2,
       "yes_pct": 84.6,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Charter amendment creating an independent Police Accountability Board and director.",
+      "source_url": "https://www.lwvbae.org/wp-content/uploads/2020/08/Berkeley-Measures-20-11.pdf",
+      "pass_threshold": "majority",
+      "threshold_note": "Charter amendment; ballot label 'Majority vote required.'"
     },
     "Measure JJ - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -300,10 +300,10 @@
       "final_margin_pct": 29.4,
       "yes_pct": 64.7,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Charter amendment tying Mayor and Council salaries to Alameda County median income.",
+      "source_url": "https://www.lwvbae.org/wp-content/uploads/2020/08/Berkeley-Measures-20-11.pdf",
+      "pass_threshold": "majority",
+      "threshold_note": "Charter amendment; ballot label 'Majority vote.'"
     },
     "Measure KK - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -313,10 +313,10 @@
       "final_margin_pct": 50.9,
       "yes_pct": 75.4,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Charter amendment removing firefighter residency rules and updating other provisions.",
+      "source_url": "https://www.lwvbae.org/wp-content/uploads/2020/08/Berkeley-Measures-20-11.pdf",
+      "pass_threshold": "majority",
+      "threshold_note": "Charter amendment; ballot label 'Majority vote required.'"
     },
     "Measure LL - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -326,10 +326,10 @@
       "final_margin_pct": 63.2,
       "yes_pct": 81.6,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Raised the Gann appropriations limit to spend existing tax revenue, FY2021\u20132024.",
+      "source_url": "https://www.lwvbae.org/wp-content/uploads/2020/08/Berkeley-Measures-20-11.pdf",
+      "pass_threshold": "majority",
+      "threshold_note": "Appropriations-limit measure, not a tax; ballot label 'Needs majority.'"
     },
     "Measure MM - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -339,10 +339,10 @@
       "final_margin_pct": 13.4,
       "yes_pct": 56.7,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Amended the rent ordinance to bar emergency-period nonpayment evictions and add fees.",
+      "source_url": "https://www.lwvbae.org/wp-content/uploads/2020/08/Berkeley-Measures-20-11.pdf",
+      "pass_threshold": "majority",
+      "threshold_note": "Ordinance amendment; ballot label 'Needs majority.'"
     }
   },
   "2020-03-primary": {
@@ -354,10 +354,10 @@
       "final_margin_pct": 61.0,
       "yes_pct": 80.5,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "12-year school parcel tax (~12.4\u00a2/sq ft) funding Berkeley schools staff salaries.",
+      "source_url": "https://ballotpedia.org/Berkeley_Unified_School_District,_California,_Measure_E,_Parcel_Tax_(March_2020)",
+      "pass_threshold": "two_thirds",
+      "threshold_note": "Dedicated special parcel tax \u2014 two-thirds."
     },
     "Measure H - Berkeley USD": {
       "jurisdiction": "Berkeley USD",
@@ -367,10 +367,10 @@
       "final_margin_pct": 67.4,
       "yes_pct": 83.7,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "10-year school parcel tax (~9\u00a2/sq ft) funding maintenance, grounds, and facilities.",
+      "source_url": "https://ballotpedia.org/Berkeley_Unified_School_District,_California,_Measure_H,_Parcel_Tax_(March_2020)",
+      "pass_threshold": "two_thirds",
+      "threshold_note": "Dedicated special parcel tax (not a Prop-39 bond) \u2014 two-thirds."
     }
   },
   "2018-11-general": {
@@ -395,10 +395,10 @@
       "final_margin_pct": 44.7,
       "yes_pct": 72.3,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Increased the real-property transfer tax on sales over $1.5M to fund homeless services.",
+      "source_url": "https://ballotpedia.org/Berkeley,_California,_Measure_P,_Real_Property_Transfer_Tax_Increase_(November_2018)",
+      "pass_threshold": "majority",
+      "threshold_note": "General tax (unrestricted general fund) \u2014 majority."
     },
     "Measure Q - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -408,10 +408,10 @@
       "final_margin_pct": 42.8,
       "yes_pct": 71.4,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Amended the rent stabilization ordinance's exemptions for new construction and ADUs.",
+      "source_url": "https://ballotpedia.org/Berkeley,_California,_Measure_Q,_Rent_Control_Ordinance_Amendments_(November_2018)",
+      "pass_threshold": "majority",
+      "threshold_note": "Ordinance amendment \u2014 majority."
     },
     "Measure R - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -421,10 +421,10 @@
       "final_margin_pct": 69.2,
       "yes_pct": 84.6,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Non-binding advisory measure endorsing the Vision 2050 infrastructure plan.",
+      "source_url": "https://ballotpedia.org/Berkeley,_California,_Measure_R,_Vision_2050_Advisory_Measure_(November_2018)",
+      "pass_threshold": "majority",
+      "threshold_note": "Advisory measure \u2014 majority."
     }
   },
   "2016-11-general": {
@@ -436,10 +436,10 @@
       "final_margin_pct": 77.7,
       "yes_pct": 88.8,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Renewed an 8-year school parcel tax of 37\u00a2 per square foot for Berkeley public schools.",
+      "source_url": "https://ballotpedia.org/Berkeley_Unified_School_District,_California,_Parcel_Tax,_Measure_E1_(November_2016)",
+      "pass_threshold": "two_thirds",
+      "threshold_note": "School district special parcel tax \u2014 two-thirds."
     },
     "Measure U1 - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -449,10 +449,10 @@
       "final_margin_pct": 49.8,
       "yes_pct": 74.9,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Raised the business-license tax on landlords with five or more units to 2.88%.",
+      "source_url": "https://ballotpedia.org/Berkeley,_California,_Business_License_Tax,_Measure_U1_(November_2016)",
+      "pass_threshold": "majority",
+      "threshold_note": "General business-license tax (general fund) \u2014 majority."
     },
     "Measure DD - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -462,10 +462,10 @@
       "final_margin_pct": 42.0,
       "yes_pct": 29.0,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Proposed raising the business-license tax on landlords of three or more units to 1.5%.",
+      "source_url": "https://ballotpedia.org/Berkeley,_California,_Business_License_Tax_Increase,_Measure_DD_(November_2016)",
+      "pass_threshold": "majority",
+      "threshold_note": "General business-license tax (general fund) \u2014 majority."
     },
     "Measure V1 - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -475,10 +475,10 @@
       "final_margin_pct": 75.5,
       "yes_pct": 87.7,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Raised the city's Gann appropriations limit to allow spending approved tax revenue.",
+      "source_url": "https://ballotpedia.org/Berkeley,_California,_City_Appropriation_Limit_Increase,_Measure_V1_(November_2016)",
+      "pass_threshold": "majority",
+      "threshold_note": "Appropriations-limit override, not a tax \u2014 majority."
     },
     "Measure W1 - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -488,10 +488,10 @@
       "final_margin_pct": 76.3,
       "yes_pct": 88.1,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Amended the charter to move redistricting to an independent citizens commission.",
+      "source_url": "https://ballotpedia.org/Berkeley,_California,_City_Council_Redistricting_Charter_Amendment,_Measure_W1_(November_2016)",
+      "pass_threshold": "majority",
+      "threshold_note": "Charter amendment \u2014 majority."
     },
     "Measure X1 - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -501,10 +501,10 @@
       "final_margin_pct": 29.7,
       "yes_pct": 64.8,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Amended the charter to create a Fair Elections Fund matching small campaign donations.",
+      "source_url": "https://ballotpedia.org/Berkeley,_California,_Funding_for_Public_Campaign_Finance_Program,_Measure_X1_(November_2016)",
+      "pass_threshold": "majority",
+      "threshold_note": "Charter amendment (general-fund program), not a tax \u2014 majority."
     },
     "Measure Y1 - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -514,10 +514,10 @@
       "final_margin_pct": 40.6,
       "yes_pct": 70.3,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Amended the charter to let 16- and 17-year-olds vote in school board elections.",
+      "source_url": "https://ballotpedia.org/Berkeley,_California,_School_Director_Election_Youth_Voting,_Measure_Y1_(November_2016)",
+      "pass_threshold": "majority",
+      "threshold_note": "Charter amendment \u2014 majority."
     },
     "Measure Z1 - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -527,10 +527,10 @@
       "final_margin_pct": 66.7,
       "yes_pct": 83.3,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Authorized public agencies to develop up to 500 low-rent housing units.",
+      "source_url": "https://ballotpedia.org/Berkeley,_California,_Additional_Low_Rent_Housing,_Measure_Z1_(November_2016)",
+      "pass_threshold": "majority",
+      "threshold_note": "Article XXXIV public-housing authorization, not a tax \u2014 majority."
     },
     "Measure AA - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -540,10 +540,10 @@
       "final_margin_pct": 46.2,
       "yes_pct": 73.1,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Raised relocation payments landlords owe tenants evicted for owner move-in.",
+      "source_url": "https://ballotpedia.org/Berkeley,_California,_Owner_Move-In_Eviction_Changes,_Measure_AA_(November_2016)",
+      "pass_threshold": "majority",
+      "threshold_note": "Rent/eviction ordinance amendment (initiative) \u2014 majority."
     },
     "Measure BB - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -553,10 +553,10 @@
       "final_margin_pct": 32.0,
       "yes_pct": 34.0,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Proposed raising Berkeley's minimum wage to $15 per hour on a set schedule.",
+      "source_url": "https://ballotpedia.org/Berkeley,_California,_$15_Minimum_Wage_Increase,_Measure_BB_(November_2016)",
+      "pass_threshold": "majority",
+      "threshold_note": "Ordinance/initiative, not a tax \u2014 majority."
     },
     "Measure CC - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -566,10 +566,10 @@
       "final_margin_pct": 30.8,
       "yes_pct": 34.6,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Proposed raising the minimum wage toward $16.37 and expanding paid sick leave.",
+      "source_url": "https://ballotpedia.org/Berkeley,_California,_$16.37_Minimum_Wage_Increase,_Measure_CC_(November_2016)",
+      "pass_threshold": "majority",
+      "threshold_note": "Ordinance/initiative, not a tax \u2014 majority."
     }
   },
   "2014-11-general": {
@@ -594,10 +594,10 @@
       "final_margin_pct": 52.4,
       "yes_pct": 76.2,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "One-cent-per-ounce general tax on distributors of sugar-sweetened beverages.",
+      "source_url": "https://ballotpedia.org/City_of_Berkeley_Sugary_Beverages_and_Soda_Tax_Question,_Measure_D_(November_2014)",
+      "pass_threshold": "majority",
+      "threshold_note": "General tax to the general fund \u2014 simple majority."
     },
     "Measure F - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -607,10 +607,10 @@
       "final_margin_pct": 50.2,
       "yes_pct": 75.1,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Increased the special parcel tax funding city parks, trees, and landscaping.",
+      "source_url": "https://ballotpedia.org/City_of_Berkeley_Special_Parks_Parcel_Tax,_Measure_F_(November_2014)",
+      "pass_threshold": "two_thirds",
+      "threshold_note": "Dedicated special parcel tax \u2014 two-thirds."
     },
     "Measure O - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -620,10 +620,10 @@
       "final_margin_pct": 81.1,
       "yes_pct": 90.6,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Amended the city charter to conform elections, recall, and petition rules to state law.",
+      "source_url": "https://ballotpedia.org/City_of_Berkeley_Elections_Code_Charter_Amendment,_Measure_O_(November_2014)",
+      "pass_threshold": "majority",
+      "threshold_note": "Charter amendment \u2014 simple majority."
     },
     "Measure P - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -633,10 +633,10 @@
       "final_margin_pct": 69.3,
       "yes_pct": 84.6,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Advisory measure urging a constitutional amendment that corporations are not people.",
+      "source_url": "https://ballotpedia.org/Berkeley,_California,_Measure_P,_Citizens_United_Advisory_Measure_(November_2014)",
+      "pass_threshold": "majority",
+      "threshold_note": "Advisory/opinion measure \u2014 simple majority."
     },
     "Measure Q - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -646,10 +646,10 @@
       "final_margin_pct": 57.5,
       "yes_pct": 78.7,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Advisory measure supporting a right for employees to request shorter or part-time hours.",
+      "source_url": "https://ballotpedia.org/City_of_Berkeley_Right_to_Request_Part_Time_Work_Advisory_Question,_Measure_Q_(November_2014)",
+      "pass_threshold": "majority",
+      "threshold_note": "Advisory/opinion measure \u2014 simple majority."
     },
     "Measure R - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -659,10 +659,10 @@
       "final_margin_pct": 48.4,
       "yes_pct": 25.8,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Initiative to amend downtown zoning with height limits and affordable-housing rules.",
+      "source_url": "https://ballotpedia.org/City_of_Berkeley_Zoning_Ordinance_Amendments,_Measure_R_(November_2014)",
+      "pass_threshold": "majority",
+      "threshold_note": "Zoning ordinance/initiative \u2014 simple majority."
     },
     "Measure S - City of Berkeley": {
       "jurisdiction": "City of Berkeley",
@@ -672,10 +672,10 @@
       "final_margin_pct": 27.7,
       "yes_pct": 63.9,
       "reconciled": false,
-      "summary": null,
-      "source_url": null,
-      "pass_threshold": null,
-      "threshold_note": null
+      "summary": "Referendum on the City Council's 2013 redistricting map based on the 2010 Census.",
+      "source_url": "https://ballotpedia.org/City_of_Berkeley_Redistricting_Map_Referendum,_Measure_S_(November_2014)",
+      "pass_threshold": "majority",
+      "threshold_note": "Referendum on an ordinance \u2014 simple majority."
     }
   }
 }

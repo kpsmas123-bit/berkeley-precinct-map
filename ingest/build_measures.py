@@ -77,6 +77,8 @@ def main():
     manifest = json.load(open(os.path.join(PROC, "elections.json")))["elections"]
     mpath = os.path.join(PROC, "measures.json")
     existing = json.load(open(mpath)) if os.path.exists(mpath) else {}
+    rpath = os.path.join(PROC, "measure_research.json")   # curated summaries + thresholds
+    research = json.load(open(rpath)) if os.path.exists(rpath) else {}
 
     out, todo = {}, []
     for e in manifest:
@@ -103,6 +105,7 @@ def main():
             if not (local or competitive):        # county/state only when competitive
                 continue
             prev = existing.get(eid, {}).get(name, {})
+            r = research.get(eid, {}).get(name, {})   # curated research overrides placeholders
             out.setdefault(eid, {})[name] = {
                 "jurisdiction": juris,
                 "margin_basis": basis,
@@ -111,10 +114,10 @@ def main():
                 "final_margin_pct": round(margin, 1),
                 "yes_pct": round(yes_pct, 1),
                 "reconciled": results.get("qa") != "none" and meta.get("verified") is True,
-                "summary": prev.get("summary"),
-                "source_url": prev.get("source_url"),
-                "pass_threshold": prev.get("pass_threshold"),   # majority | 55 | two_thirds | null (researched)
-                "threshold_note": prev.get("threshold_note"),
+                "summary": r.get("summary") or prev.get("summary"),
+                "source_url": r.get("source_url") or prev.get("source_url"),
+                "pass_threshold": r.get("pass_threshold") or prev.get("pass_threshold"),   # majority | 55 | two_thirds | null
+                "threshold_note": r.get("threshold_note") or prev.get("threshold_note"),
             }
             if local and (not out[eid][name]["summary"] or not out[eid][name]["pass_threshold"]):
                 todo.append({"election": eid, "contest": name, "jurisdiction": juris,
