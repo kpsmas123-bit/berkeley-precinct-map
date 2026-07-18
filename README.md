@@ -119,8 +119,32 @@ comparable across redistricting cycles** — the panel labels the vintage to mak
   current SOV layout; older years may need per-election adapters (and 2014-era may be
   PDF-only or Statewide Database CSVs).
 
-## Sources
+## Sources & attribution
 
-- Alameda County ROV — Statement of Vote & District Canvass (certified).
-- Alameda County Open Data Hub — Consolidated Precincts (per election).
-- City of Berkeley — Council Districts (2022 redistricting).
+- **Election tallies:** Alameda County Registrar of Voters — Statement of Vote & District Canvass (public records; not copyrightable).
+- **Precinct geometry:** Alameda County Open Data Hub — Consolidated Precincts (per election).
+- **Council districts:** City of Berkeley — Council Districts (2013 & 2021 redistricting).
+- **Basemap:** © OpenStreetMap contributors (ODbL), © CARTO — attribution shown on the map.
+- **Library:** MapLibre GL JS (3-Clause BSD), self-hosted under `site/vendor/` (no third-party CDN at runtime).
+
+## License
+
+- **Code:** MIT (see [LICENSE](LICENSE)).
+- **Derived data** (`data/processed/`, `site/data/`): CC-BY-4.0. Underlying tallies are public records.
+
+## Privacy
+
+The published page sets **no cookies and runs no analytics/trackers**. It stores one
+local flag (`bpm_about_v1`) in the browser to avoid re-showing the intro. Map tiles are
+fetched from CARTO/OpenStreetMap, which see the visitor's IP as any web request would.
+
+## Publishing to GitHub Pages
+
+The site is the static `site/` directory (no build step). A ready-to-use workflow is at
+[`.github/workflows/pages.yml`](.github/workflows/pages.yml):
+
+1. Create a **public** GitHub repo and push (`gh repo create <name> --public --source=. --push`).
+2. Repo **Settings → Pages → Source: GitHub Actions**.
+3. Push to `main` — the workflow uploads `site/` and deploys. (Private repos need a paid plan for Pages.)
+
+Alternatively, rename `site/` → `docs/` and use the classic "deploy from /docs" option.
