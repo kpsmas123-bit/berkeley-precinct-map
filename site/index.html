@@ -201,6 +201,8 @@ const MODES = ["winner","choice","turnout","deviation","alignment"];
 const DEV_MAX = 0.15;          // 15 pts saturates the diverging scale
 const MATERIAL = 0.03;         // 3-pt materiality gate
 const NEUTRAL = "#e8e8e6", UNSCORED = "#e6ddc7";
+const OVER_NOTE = "Turnout over 100%: California allows same-day (conditional) voter registration, so ballots cast can exceed the pre-election registered-voter count (precinct consolidation adds to this too).";
+const overReg = p => p.registered && p.ballots_cast > p.registered;
 
 const state = { election:null, contest:null, mode:"winner", choice:null, baseline:"district",
                 district:null, focus:null, results:null, catalog:null, dmembers:{},
@@ -519,8 +521,11 @@ function buildLegend(cmap){
       + `<div class="row" style="margin-top:4px"><span class="sw" style="background:${UNSCORED}"></span>no scored contests</div>`;
   } else if(state.mode==="turnout"){
     const noTurnout=Object.values(state.results.precincts).every(p=>!p.registered);
+    const anyOver=Object.values(state.results.precincts).some(overReg);
     el.innerHTML=`<div style="font-weight:600;margin-bottom:4px">Turnout (ballots / registered)</div>`
-      + (noTurnout?`<div style="color:#8a5a00">Not published for this election.</div>`:gradientBar(["0%","25%","50%","75%","100%"]));
+      + (noTurnout?`<div style="color:#8a5a00">Not published for this election.</div>`
+                  :gradientBar(["0%","25%","50%","75%","100%+"])
+                   + (anyOver?`<div style="font-size:11px;color:#8a5a00;margin-top:3px">Some precincts exceed 100% (same-day registration; shown at full scale).</div>`:""));
   } else if(state.mode==="choice") el.innerHTML=`<div style="font-weight:600;margin-bottom:4px">% for ${esc(state.choice)}${cat.multi?" (per ballot)":""}</div>`+gradientBar(["0%","","50%","","100%"]);
   else { const seatTxt=cat.multi?`Top vote-getter <span style="color:#8a5a00">· multi-seat${cat.seats?", "+cat.seats+" seats":""}</span>`:`Winner`;
     el.innerHTML=`<div style="font-weight:600;margin-bottom:4px">${seatTxt}${cat.rcv?" (1st choice)":""}</div>`+cat.choices.map(c=>`<div class="row"><span class="sw" style="background:${cmap[c]}"></span>${esc(c)}</div>`).join("")
@@ -692,14 +697,18 @@ function showDistrict(){
   } else html+=`<div class="noballot">“${esc(state.contest)}” was not on the ballot in District ${esc(d)}.</div>`;
 
   // per-precinct breakdown
+  let anyOver=false;
   pids.forEach(pid=>{ const p=state.results.precincts[pid], c=p.contests[state.contest];
     const tpct=p.registered?(100*p.ballots_cast/p.registered).toFixed(1):"—";
+    const over=overReg(p); if(over) anyOver=true;
     html+=`<div class="prec ${pid===state.focus?"focus":""}" data-pid="${pid}">`
-      + `<button class="ph" type="button" aria-label="Precinct ${esc(pid)} details"><span class="pid">Precinct ${esc(pid)}</span><span class="turn">turnout ${tpct}% · ${(p.ballots_cast||0).toLocaleString()}/${(p.registered||0).toLocaleString()}</span></button>`;
+      + `<button class="ph" type="button" aria-label="Precinct ${esc(pid)} details"><span class="pid">Precinct ${esc(pid)}</span>`
+      + `<span class="turn"${over?` title="${esc(OVER_NOTE)}"`:""}>turnout ${tpct}%${over?` <span style="color:#8a5a00">†</span>`:""} · ${(p.ballots_cast||0).toLocaleString()}/${(p.registered||0).toLocaleString()}</span></button>`;
     if(c){ const [win]=winnerOf(c.choices); html+=resultsTable(c.choices,cmap,win); }
     else html+=`<div class="noballot">not on this precinct’s ballot</div>`;
     html+=`</div>`;
   });
+  if(anyOver) html+=`<div class="noballot" style="color:#8a5a00">† ${esc(OVER_NOTE)}</div>`;
 
   html+=creditHtml(vintage);
   panel.innerHTML=html;
