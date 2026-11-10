@@ -1,5 +1,60 @@
 {
   "note": "Research queue: every LOCAL Berkeley measure still missing a summary and/or a pass_threshold. pass_threshold is one of majority | 55 | two_thirds and MUST be read from the measure text (general vs special tax), not guessed. Fill summary + pass_threshold in measures.json; rebuild preserves them.",
-  "count": 0,
-  "queue": []
+  "count": 6,
+  "queue": [
+    {
+      "election": "2026-11-general",
+      "contest": "Measure AA - City of Berkeley",
+      "jurisdiction": "City of Berkeley",
+      "yes_share": 76.5,
+      "margin": 53.0,
+      "summary": null,
+      "pass_threshold": null
+    },
+    {
+      "election": "2026-11-general",
+      "contest": "Measure V - City of Berkeley",
+      "jurisdiction": "City of Berkeley",
+      "yes_share": 53.0,
+      "margin": 5.9,
+      "summary": null,
+      "pass_threshold": null
+    },
+    {
+      "election": "2026-11-general",
+      "contest": "Measure W - City of Berkeley",
+      "jurisdiction": "City of Berkeley",
+      "yes_share": 68.6,
+      "margin": 37.3,
+      "summary": null,
+      "pass_threshold": null
+    },
+    {
+      "election": "2026-11-general",
+      "contest": "Measure X - City of Berkeley",
+      "jurisdiction": "City of Berkeley",
+      "yes_share": 69.9,
+      "margin": 39.9,
+      "summary": null,
+      "pass_threshold": null
+    },
+    {
+      "election": "2026-11-general",
+      "contest": "Measure Y - City of Berkeley",
+      "jurisdiction": "City of Berkeley",
+      "yes_share": 69.7,
+      "margin": 39.4,
+      "summary": null,
+      "pass_threshold": null
+    },
+    {
+      "election": "2026-11-general",
+      "contest": "Measure Z - City of Berkeley",
+      "jurisdiction": "City of Berkeley",
+      "yes_share": 45.0,
+      "margin": 10.0,
+      "summary": null,
+      "pass_threshold": null
+    }
+  ]
 }

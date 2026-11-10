@@ -139,15 +139,24 @@ county is currently mapping.
 | `alamedacountyca.gov/rovresults/<id>/` — the results portal | every contest on the ballot, countywide totals, the "Preliminary/Unofficial — Update #N / Last Updated" stamp, registration and turnout | any geography at all |
 | `electionmaps.alamedacountyca.gov/json/electionResults.json` — the feed behind the county's own results map | **per-precinct votes**, and each precinct's reporting status | all but the one or two contests the county chooses to map (Nov 2026: CD-14 and Measure RTM) |
 
-**The Berkeley map** (`index.html`) uses both. `ingest/build_pending_results.py` keeps the
-precinct rows for any mapped contest that is on Berkeley's ballot and writes
-`precinct_results: "partial"`; those contests then behave exactly like certified ones,
-council-district rollups included. Berkeley is in CD-12, which the county does not map, but
-the Nov 2026 transit measure is countywide and covers all 31 Berkeley precincts — Berkeley
-went **85.6% Yes** against 66.8% countywide. Every other contest on the ballot stays
-citywide-only in a second panel tab, **Latest Berkeley totals**; only contests whose
-jurisdiction *is* Berkeley are kept there, because the portal reports county and state
-contests countywide and a countywide number on a Berkeley map would be false.
+**The Berkeley map** (`index.html`) uses whichever source exists.
+`ingest/build_pending_results.py` keeps the precinct rows for any contest on Berkeley's
+ballot and writes `precinct_results: "partial"`; those contests then behave exactly like
+certified ones, council-district rollups included.
+
+The difference a CVR makes here is the whole point. The county's results map does not
+carry CD-12, so without one Berkeley could not see its own member of Congress on its own
+map: Nov 2026 had exactly **one** mapped contest, the countywide transit measure (Berkeley
+**85.6% Yes** against 66.8% countywide). With the CVR it has **54** — the entire ballot,
+CD-12 included, where Lateefah Simon ranges from 72.4% to 90.5% across the 31 precincts.
+Drop the export at `data/raw/<eid>/cvr/export.zip` or set `CVR_EXPORT`, then
+`./build.sh <eid>`.
+
+Without a CVR, every contest the results map does not cover stays citywide-only in a
+second panel tab, **Latest Berkeley totals**; only contests whose jurisdiction *is*
+Berkeley are kept there, because the portal reports county and state contests countywide
+and a countywide number on a Berkeley map would be false. With a CVR that tab becomes a
+cross-check against the county's own published figures rather than the only source.
 
 With nothing mapped the file keeps `precinct_results: false` and the old behaviour: the
 choropleth is deliberately blank rather than guessing, and the controls are locked.
@@ -256,6 +265,11 @@ The rest of the traps:
   contests only `Rank: 1` is counted by default (`--rcv-all-ranks` to change), which
   matches how this project reports RCV elsewhere. The full ranking is in the file, so a
   real round-by-round count is possible later without re-requesting anything.
+- **Ranked contests are named differently.** The CVR calls it `Auditor - Berkeley
+  (RCV)`; the portal, the results map and the certified Statement of Vote all call it
+  `Auditor - Berkeley` and carry the ranking separately. Left alone the same race appears
+  twice under two names, and every ranked contest is silently renamed the day the
+  certified canvass replaces the file. The suffix is stripped and the flag kept.
 - **The precinct join differs by county.** A CVR names a *precinct portion*. The vendor
   doc points at `ExternalId`, which in Alameda is a meaningless sequence number
   (`"0001"`) while the portion's `Description` is the six-digit precinct id. Candidates
@@ -264,6 +278,16 @@ The rest of the traps:
   file. `--portion-map` forces it.
 - **The `.sha` file beside the export is a 128-byte RSA signature, not a checksum**, so
   it cannot be verified without the county's public key.
+
+### Moving between the two maps
+
+A Berkeley reader looking at a countywide race — Congress, Governor, a proposition —
+usually wants to know how Berkeley compares with everywhere else, and that answer is on
+the other map. So when the selected contest is not Berkeley-specific, the Berkeley map's
+corner link becomes **"This race countywide →"** and carries the election, contest, mode
+and chosen candidate across, instead of dropping the reader on the county map's default
+view to find the race again. Berkeley-only contests keep the plain "County map" link,
+since the county map does not carry them.
 
 ### Shareable links
 

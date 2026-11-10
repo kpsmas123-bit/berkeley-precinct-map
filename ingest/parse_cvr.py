@@ -102,6 +102,12 @@ import sys
 import zipfile
 
 DIGITS = re.compile(r"(\d{3,8})")
+# The CVR names a ranked contest "Auditor - Berkeley (RCV)"; the county's results
+# portal, its results map and the certified Statement of Vote all call it "Auditor -
+# Berkeley" and carry the ranking separately. Keeping the suffix would list the same
+# race twice under two names, and would rename every ranked contest the moment the
+# certified canvass replaced this file. Strip it and keep the flag.
+RCV_SUFFIX = re.compile(r"\s*\(RCV\)\s*$", re.I)
 
 
 # ---------------------------------------------------------------- file access
@@ -265,7 +271,10 @@ def main():
         known_ids = set(map(str, json.load(open(opt["precinct-ids"]))))
     pmap, how = portion_to_precinct(portions_m, precincts_m, override, known_ids)
 
-    cname = {i: str(c.get("Description", "")).strip() for i, c in contests_m.items()}
+    cname = {i: RCV_SUFFIX.sub("", str(c.get("Description", "")).strip())
+             for i, c in contests_m.items()}
+    ranked_by_name = {i: bool(RCV_SUFFIX.search(str(c.get("Description", ""))))
+                      for i, c in contests_m.items()}
     vote_for = {i: int(c.get("VoteFor", 1) or 1) for i, c in contests_m.items()}
     ranks = {i: int(c.get("NumOfRanks", 0) or 0) for i, c in contests_m.items()}
     chname = {i: str(c.get("Description", "")).strip() for i, c in cands_m.items()}
@@ -360,7 +369,8 @@ def main():
             continue
         kind = "measure" if all(re.fullmatch(r"(bonds\s+)?(yes|no)", c, re.I)
                                 for c in chs) else "candidate"
-        catalog[name] = {"rcv": ranks.get(cid, 0) > 1, "kind": kind,
+        catalog[name] = {"rcv": ranks.get(cid, 0) > 1 or ranked_by_name.get(cid, False),
+                         "kind": kind,
                          "choices": chs, "vote_for": vote_for.get(cid, 1)}
     catalog = {n: catalog[n] for n in sorted(catalog)
                if any(n in p["contests"] for p in precincts.values())}

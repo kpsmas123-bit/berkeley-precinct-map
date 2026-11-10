@@ -35,6 +35,7 @@ PARSER = os.path.join(ROOT, "ingest", "parse_cvr.py")
 CD = "U.S. Representative, 12th Congressional District"
 RTM = "Measure RTM - Public Transit Revenue Measure District"
 CC = "Member, City Council, District 1 - Berkeley"
+CC_CVR = CC + " (RCV)"      # how the CVR spells it; every other source omits this
 
 
 def mark(cid, rank=1, vote=True, amb=False):
@@ -74,7 +75,7 @@ def build(d):
     w("ContestManifest", {"Version": V, "List": [
         {"Id": 10, "Description": CD, "VoteFor": 1, "NumOfRanks": 0},
         {"Id": 20, "Description": RTM, "VoteFor": 1, "NumOfRanks": 0},
-        {"Id": 30, "Description": CC, "VoteFor": 1, "NumOfRanks": 3},
+        {"Id": 30, "Description": CC_CVR, "VoteFor": 1, "NumOfRanks": 3},
         {"Id": 40, "Description": "Contest Nobody Voted In", "VoteFor": 1, "NumOfRanks": 0}]})
     w("CandidateManifest", {"Version": V, "List": [
         {"Id": 101, "Description": "Lateefah Simon", "ContestId": 10, "Type": "Regular"},
@@ -198,6 +199,7 @@ def main():
         print("catalog")
         eq("measure kind", d["contests"][RTM]["kind"], "measure")
         eq("rcv flag", d["contests"][CC]["rcv"], True)
+        eq("(RCV) suffix stripped from the name", CC_CVR in d["contests"], False)
         eq("unvoted contest dropped", "Contest Nobody Voted In" in d["contests"], False)
         eq("registered unknown to a CVR", P["203880"]["registered"], 0)
 

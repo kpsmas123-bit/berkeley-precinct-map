@@ -1,4 +1,84 @@
 {
+  "2026-11-general": {
+    "Measure AA - City of Berkeley": {
+      "jurisdiction": "City of Berkeley",
+      "margin_basis": "jurisdiction",
+      "local": true,
+      "competitive": false,
+      "final_margin_pct": 53.0,
+      "yes_pct": 76.5,
+      "reconciled": false,
+      "summary": null,
+      "source_url": null,
+      "pass_threshold": null,
+      "threshold_note": null
+    },
+    "Measure V - City of Berkeley": {
+      "jurisdiction": "City of Berkeley",
+      "margin_basis": "jurisdiction",
+      "local": true,
+      "competitive": true,
+      "final_margin_pct": 5.9,
+      "yes_pct": 53.0,
+      "reconciled": false,
+      "summary": null,
+      "source_url": null,
+      "pass_threshold": null,
+      "threshold_note": null
+    },
+    "Measure W - City of Berkeley": {
+      "jurisdiction": "City of Berkeley",
+      "margin_basis": "jurisdiction",
+      "local": true,
+      "competitive": false,
+      "final_margin_pct": 37.3,
+      "yes_pct": 68.6,
+      "reconciled": false,
+      "summary": null,
+      "source_url": null,
+      "pass_threshold": null,
+      "threshold_note": null
+    },
+    "Measure X - City of Berkeley": {
+      "jurisdiction": "City of Berkeley",
+      "margin_basis": "jurisdiction",
+      "local": true,
+      "competitive": false,
+      "final_margin_pct": 39.9,
+      "yes_pct": 69.9,
+      "reconciled": false,
+      "summary": null,
+      "source_url": null,
+      "pass_threshold": null,
+      "threshold_note": null
+    },
+    "Measure Y - City of Berkeley": {
+      "jurisdiction": "City of Berkeley",
+      "margin_basis": "jurisdiction",
+      "local": true,
+      "competitive": false,
+      "final_margin_pct": 39.4,
+      "yes_pct": 69.7,
+      "reconciled": false,
+      "summary": null,
+      "source_url": null,
+      "pass_threshold": null,
+      "threshold_note": null
+    },
+    "Measure Z - City of Berkeley": {
+      "jurisdiction": "City of Berkeley",
+      "margin_basis": "jurisdiction",
+      "local": true,
+      "competitive": false,
+      "final_margin_pct": 10.0,
+      "yes_pct": 45.0,
+      "reconciled": false,
+      "summary": null,
+      "source_url": null,
+      "pass_threshold": null,
+      "threshold_note": null
+    }
+  },
   "2024-11-general": {
     "Proposition 33": {
       "jurisdiction": "California (statewide)",

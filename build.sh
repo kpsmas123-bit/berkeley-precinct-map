@@ -45,7 +45,23 @@ build_one() {
     local CITY="$ROOT/data/processed/$CITYREL"
     mkdir -p "$(dirname "$CITY")"
     "$PY" "$ROOT/ingest/fetch_live_results.py" "$ROVID" "$CITY"                   || { echo "  FAIL live results"; return 1; }
-    "$PY" "$ROOT/ingest/build_pending_results.py" "$EID" "$GEO" "$IDS" "$CITY" "$RES" || { echo "  FAIL pending results"; return 1; }
+    # A Cast Vote Record export, if obtained, carries EVERY contest on the ballot
+    # precinct by precinct — including CD-12, which the county's results map omits.
+    # Drop it at data/raw/<eid>/cvr/export.zip (gitignored; a symlink is fine) or
+    # point CVR_EXPORT at it; without one the live results map is used instead.
+    local CVR="${CVR_EXPORT:-$RAW/cvr/export.zip}"
+    local CVRJSON="$ROOT/data/processed/results/$EID.cvr.json"
+    if [ -e "$CVR" ]; then
+      echo "  precinct source: cast vote record ($CVR)"
+      "$PY" "$ROOT/ingest/parse_cvr.py" "$CVR" "$EID" "$CVRJSON" \
+            --precinct-ids="$IDS" --quiet                                        || { echo "  FAIL CVR parse"; return 1; }
+      "$PY" "$ROOT/ingest/build_pending_results.py" "$EID" "$GEO" "$IDS" "$CITY" "$RES" \
+            --from-cvr="$CVRJSON"                                                || { echo "  FAIL pending results"; return 1; }
+      rm -f "$CVRJSON"
+    else
+      echo "  precinct source: live results-map feed (no CVR at $CVR)"
+      "$PY" "$ROOT/ingest/build_pending_results.py" "$EID" "$GEO" "$IDS" "$CITY" "$RES" || { echo "  FAIL pending results"; return 1; }
+    fi
     "$PY" "$ROOT/ingest/assign_districts.py" "$RES" "$GEO" "$DMAP" "$MAPKEY"      || { echo "  FAIL assign"; return 1; }
     "$PY" "$ROOT/ingest/build_districts.py" "$DMAP" "$DGEOP"                      || { echo "  FAIL overlay"; return 1; }
     echo "  QA skipped (awaiting certified canvass)"

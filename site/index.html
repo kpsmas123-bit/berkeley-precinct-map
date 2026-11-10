@@ -635,7 +635,15 @@ function featuredFor(eid){ return (state.featured||[]).filter(f=>f.election===ei
 const pickDefaultContest = () => {
   const f=featuredFor(state.election).find(n=>n in state.catalog);
   if(f) return f;
-  const n=Object.keys(state.catalog); return n.find(x=>/^Mayor - Berkeley/.test(x))||n[0];
+  // With a full ballot (a CVR build) the catalog can start at "AC Transit District
+  // Director, Ward 3", which is nobody's idea of the headline race. Prefer the
+  // top of the ticket, working down, before falling back to whatever sorts first.
+  const n=Object.keys(state.catalog);
+  const prefer=[/^Mayor - Berkeley/, /^Member, City Council.*Berkeley/,
+                /Congressional District/, /^Governor$/, /^President/,
+                /^School Directors - Berkeley/, /City of Berkeley/];
+  for(const rx of prefer){ const hit=n.find(x=>rx.test(x)); if(hit) return hit; }
+  return n[0];
 };
 
 function buildContestPicker(){
@@ -697,6 +705,7 @@ function render(){
     tb.title=noTurnout? "No per-precinct registration published for this election yet" : "";
     if(noTurnout && state.mode==="turnout"){ state.mode="winner"; syncModeButtons(); }
   }
+  syncCountyLink();
   const cat=state.catalog[state.contest];
   const usesChoice = state.mode==="choice"||state.mode==="deviation";
   document.getElementById("rcvNote").style.display = cat.rcv?"block":"none";
@@ -746,21 +755,63 @@ function wireTabs(){
     state.tab=b.dataset.tab; render();
   });
 }
+/* Berkeley is a seventh of Alameda County, and plenty of the contests on this ballot
+   — Congress, Governor, the propositions — are countywide races where the interesting
+   question is how Berkeley compares with everywhere else. When the selected contest is
+   one of those, point the County map link straight at the SAME race, carrying the mode
+   and the chosen candidate, instead of dumping the reader on the county map's default
+   view to find it again. Berkeley-only contests keep the plain link, since the county
+   map does not carry them. */
+function syncCountyLink(){
+  const a=document.getElementById("countyLink");
+  if(!a) return;
+  const n=state.contest || "";
+  const countywide = n && !/Berkeley/i.test(n);
+  if(!countywide){
+    a.href="./county.html";
+    a.textContent="County map";
+    a.title="Countywide map: statewide offices, Congress and propositions";
+    return;
+  }
+  const p=[state.election, slug(n), state.mode==="alignment"? "winner" : state.mode];
+  if((state.mode==="choice"||state.mode==="deviation") && state.choice)
+    p.push("c-"+bareSlug(state.choice));
+  a.href="./county.html#"+p.join("/");
+  a.textContent="This race countywide →";
+  a.title=`See ${n} across all of Alameda County`;
+}
+
 function partialBanner(){
   const cw=state.results.citywide||{}, live=livePrecincts();
   const mapped=Object.keys(state.catalog);
-  const other=((cw.contests||[]).length);
+  const cwNames=(cw.contests||[]).map(c=>c.name||c);
+  // a contest in the citywide block that is ALSO mapped is a cross-check, not a gap
+  const other=cwNames.filter(n=>!(n in state.catalog)).length;
   const feed=live._feed||{};
+  const fromCVR = live._source === "cast_vote_record";
   return `<div class="card" style="background:#fff7e6;border-color:#f0d9a8;color:#8a5a00;font-size:12.5px;line-height:1.5">`
     + `<b>${esc(cw.status||"Preliminary/Unofficial")}</b>`
     + (cw.county_last_updated? ` · county last updated ${esc(cw.county_last_updated)}`:"")
-    + `<br>The certified precinct canvass is still a few weeks out, but the county's live
-       results map does publish per-precinct votes for `
-    + (mapped.length===1? `one contest on this ballot` : `${mapped.length} contests on this ballot`)
-    + ` — so ${mapped.length===1?"it is":"they are"} mapped for real here. The other
-       <b>${other}</b> Berkeley contest${other===1?"":"s"} ${other===1?"is":"are"} citywide totals only;
-       ${other===1?"it is":"they are"} in the <b>Latest Berkeley totals</b> tab.`
+    + (fromCVR
+        ? `<br>The certified precinct canvass is still a few weeks out, but the county's
+             <b>cast vote record</b> — one anonymised record per ballot — covers
+             <b>${mapped.length}</b> contests on this ballot, every one of them mapped for
+             real here.`
+        : `<br>The certified precinct canvass is still a few weeks out, but the county's live
+             results map does publish per-precinct votes for `
+          + (mapped.length===1? `one contest on this ballot` : `${mapped.length} contests on this ballot`)
+          + ` — so ${mapped.length===1?"it is":"they are"} mapped for real here.`)
+    + (other
+        ? ` The other <b>${other}</b> Berkeley contest${other===1?"":"s"} ${other===1?"is":"are"}
+            citywide totals only; ${other===1?"it is":"they are"} in the
+            <b>Latest Berkeley totals</b> tab.`
+        : ` The <b>Latest Berkeley totals</b> tab has the county's own published citywide
+            figures alongside, as a cross-check.`)
     + `<br>Registration is not published per precinct yet, so turnout is off.`
+    + (fromCVR
+        ? ` Choices on ballots traceable to an individual voter are redacted by law and are
+            absent.`
+        : "")
     + (feed.url? ` <a class="src" href="${esc(feed.url)}" target="_blank" rel="noopener">results-map feed</a>`:"")
     + `</div>`;
 }
