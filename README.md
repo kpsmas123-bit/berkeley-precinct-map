@@ -99,11 +99,21 @@ Berkeley one, and the output is then trimmed to the big-contest whitelist.
 | filter | `ingest/filter_county_results.py` | `county/results/<id>.json` — whitelist only, plus city/county rollups |
 | manifest | `ingest/build_county_manifest.py` | `county/elections.json` |
 
+An election with no certified canvass yet takes the **preliminary** path instead — see
+[Elections awaiting certification](#elections-awaiting-certification).
+
 Which contests qualify lives in **`ingest/county_contests.py`**. Categories `statewide`,
-`federal`, `proposition` and `recall` are on; `legislative` (State Senate/Assembly),
+`federal`, `proposition`, `recall` and `regional` are on; `legislative` (State Senate/Assembly),
 `judicial` (appellate retention) and `county` (sheriff, DA, supervisors, county measures)
 are defined but off — add one to `ENABLED` and re-run, no other code change. Across the
-nine built elections this keeps 109 contests and drops 511 local ones.
+nine certified elections this keeps 109 contests and drops 511 local ones.
+
+`regional` is for a measure put to the **whole county** by a district that spans it — the
+Nov 2026 transit measure (Measure RTM) is on essentially every county ballot, so it maps
+as meaningfully as a state proposition. It is matched by exact jurisdiction rather than by
+a loose "district" rule, because most district measures cover one school or park district
+and would leave the county map 95% empty. A new region-wide measure needs its own line,
+deliberately: adding one should be a decision, not a side effect.
 
 **Jurisdiction labels** come from the city contests a precinct actually votes in, with
 the county's city outlines as fallback. Geometry alone is wrong on city borders: in Nov
@@ -116,18 +126,48 @@ would otherwise relabel hundreds of unincorporated precincts.
 ### Elections awaiting certification
 
 Alameda County publishes the precinct-level Statement of Vote only at or near
-certification, roughly 30 days after election day. Before then the only machine-readable
-figures are the running contest totals on the live results portal — no precinct
-breakdown exists at all.
+certification, roughly 30 days after election day. Until then the county publishes **two**
+machine-readable feeds, and they carry different things:
 
-So an election in that window is carried as **citywide-only**: the map is deliberately
-blank rather than filled with a guess, the mode buttons and contest picker are disabled,
-and the panel shows the county's running count with its "Preliminary/Unofficial — Update
-#N / Last Updated" stamp. Only contests whose jurisdiction *is* Berkeley are kept; the
-portal reports county and state contests countywide, and a countywide number on a
-Berkeley map would be false.
+| Feed | What it has | What it is missing |
+|------|-------------|--------------------|
+| `alamedacountyca.gov/rovresults/<id>/` — the results portal | every contest on the ballot, countywide totals, the "Preliminary/Unofficial — Update #N / Last Updated" stamp, registration and turnout | any geography at all |
+| `electionmaps.alamedacountyca.gov/json/electionResults.json` — the feed behind the county's own results map | **per-precinct votes**, and each precinct's reporting status | all but the one or two contests the county chooses to map (Nov 2026: CD-14 and Measure RTM) |
 
-Re-run `./build.sh 2026-11-general` any time to refresh the citywide totals.
+**The Berkeley map** (`index.html`) uses the portal only. Its choropleth stays blank
+rather than filled with a guess, the mode buttons and contest picker are disabled, and the
+panel shows the county's running count with its update stamp. Only contests whose
+jurisdiction *is* Berkeley are kept — the portal reports county and state contests
+countywide, and a countywide number on a Berkeley map would be false.
+
+**The countywide map** (`county.html`) uses both, via
+`ingest/fetch_live_county.py`, which writes a results file in exactly the shape a
+certified build produces so every existing map mode just works:
+
+* the contests the county maps get real precinct geometry and the full mode set;
+* every other big race is carried in `county_only` as countywide totals, shown in a
+  **Latest county totals** tab alongside the mapped ones;
+* `preliminary: true` and the county's status banner are explicit in the file, so the
+  numbers cannot be shown unlabelled;
+* per-precinct registration does not exist in either feed, so it is written as 0 and the
+  turnout mode disables itself. Countywide registration and turnout *do* exist and are
+  recorded as such;
+* precinct sums are reconciled against the feed's own countywide candidate totals, and
+  the outcome is recorded in `status.reconciled`.
+
+Jurisdiction labels are the one thing a preliminary build cannot derive, since it has no
+local contests to learn from. `ingest/build_city_overrides.py` persists the
+precinct → city corrections learned from *certified* builds and the preliminary build
+applies them by precinct id (485 of the 627 Nov-2026 ids also existed in Nov 2024). Only
+disagreements are stored, never the whole table, so a reused id cannot drag a stale answer
+onto a redrawn precinct. Without this Berkeley would show 28 precincts instead of 31.
+
+Re-run either build any time to refresh — both are cheap and hit only the live feeds:
+
+```bash
+./build.sh 2026-11-general          # Berkeley: citywide totals
+./build_county.sh 2026-11-general   # county: precinct-level where it exists + all totals
+```
 
 **To finish the election once the county certifies** (~30 days after election day):
 
@@ -220,12 +260,16 @@ comparable across redistricting cycles** — the panel labels the vintage to mak
 ### `site/county.html` — countywide
 
 Same shell, different question. Election → contest (grouped Federal / Statewide /
-Propositions) → map-mode: **winner**, **margin** (leader over runner-up), **turnout**,
+Propositions / Region-wide) → map-mode: **winner**, **margin** (leader over runner-up), **turnout**,
 **% for a choice**, and **stands out** (precincts differing from the *countywide* share
 by >3 points and beyond sampling noise). The panel opens on Alameda County — contest
 totals, countywide turnout, then all 15 jurisdictions ranked by whatever the active mode
 measures — and drills into one city on click, showing its subtotal and every precinct.
-Permalink hash is `#<election>/<contest>/<mode>/<city>`.
+Permalink hash is `#<election>/<contest>/<mode>[/c-<choice>][/t-<tab>][/<city>]`.
+
+An election still being counted shows a second panel tab, **Latest county totals**, listing
+every big race's countywide numbers with the precinct-mapped ones flagged and linked back
+to the map. The tab is part of the permalink (`/t-latest`), so that view is shareable too.
 
 A statewide primary can carry 60+ candidates, so the winner legend keys only the choices
 that actually lead at least one precinct (the rest lump into "Other candidates"); the
@@ -250,6 +294,14 @@ primary they are most of the payload, and the frontend reads a missing choice as
   `qa.py` applies the same filter — note that QA passed while the bug was live, because
   the District Canvass carries the same column and both sides double-counted equally.
   **A clean reconciliation only proves the two sides agree, not that the parse is right.**
+- The results portal emits **no "End Race" marker**, so splitting on `<!-- Start Race: -->`
+  gives the last race in a section everything that follows it. In Nov 2026 that made
+  "State Superintendent" swallow the entire propositions table and report Prop 3's figure
+  as a candidate with 4.2M votes. Both scrapers now cut each body at its "Back to Top"
+  link.
+- **State propositions are not emitted as races at all.** They live in one wide table
+  (`id="panelDtlProps"`, Title | YES votes | YES % | NO votes | NO %) and need their own
+  parse — miss it and the county map silently loses every proposition.
 
 ## Sources & attribution
 

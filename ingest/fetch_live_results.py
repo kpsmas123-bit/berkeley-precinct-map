@@ -51,6 +51,10 @@ ROW = re.compile(
     re.I | re.S)
 DIV = lambda cls: re.compile(r"<div[^>]*class=\"" + cls + r"[^\"]*\"[^>]*>(.*?)</div>", re.I | re.S)
 REPORTED, PASSING, VOTEFOR = DIV("reported"), DIV("passing"), DIV("votefor")
+# No "End Race" marker is emitted, so a split body runs to the next "Start Race"
+# comment and the last race in a section swallows what follows it. Every block ends
+# with a "Back to Top" link; cut there.
+BODY_END = re.compile(r'<div[^>]*class="backtotop"|Back to Top', re.I)
 STATUS_RE = re.compile(r"(Preliminary/Unofficial[^<]*)", re.I)
 UPDATED_RE = re.compile(r"lastUpdated[^>]*>\s*<span>\s*Last Updated:\s*([^<]+)", re.I)
 
@@ -86,7 +90,7 @@ def parse(html):
     parts = RACE_SPLIT.split(html)
     # parts = [pre, name1, body1, name2, body2, ...]
     for i in range(1, len(parts) - 1, 2):
-        name, body = txt(parts[i]), parts[i + 1]
+        name, body = txt(parts[i]), BODY_END.split(parts[i + 1])[0]
         if not BERKELEY.search(name):
             continue
         rows = []

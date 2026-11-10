@@ -5,6 +5,84 @@
   "contest_policy": "Big shared-ballot contests only: statewide constitutional offices, U.S. President/Senate/House, state propositions, and the 2021 statewide recall. Local city, school and county races are deliberately excluded \u2014 see ingest/county_contests.py.",
   "elections": [
     {
+      "id": "2026-11-general",
+      "date": "2026-11-03",
+      "name": "November 3, 2026 General Election",
+      "results": "results/2026-11-general.json",
+      "geo": "geo/2026-11-general.geojson",
+      "n_precincts": 627,
+      "n_contests": 2,
+      "cities": [
+        "Alameda",
+        "Albany",
+        "Berkeley",
+        "Dublin",
+        "Emeryville",
+        "Fremont",
+        "Hayward",
+        "Livermore",
+        "Newark",
+        "Oakland",
+        "Piedmont",
+        "Pleasanton",
+        "San Leandro",
+        "Unincorporated",
+        "Union City"
+      ],
+      "contests": [
+        {
+          "name": "U.S. Representative, 14th Congressional District",
+          "category": "federal",
+          "kind": "candidate",
+          "rcv": false,
+          "choices": [
+            "Melissa Hernandez",
+            "Aisha Wahab"
+          ]
+        },
+        {
+          "name": "Measure RTM - Public Transit Revenue Measure District",
+          "category": "regional",
+          "kind": "measure",
+          "rcv": false,
+          "choices": [
+            "Yes",
+            "No"
+          ]
+        }
+      ],
+      "sources": {
+        "precincts_geojson": "https://opendata.arcgis.com/api/v3/datasets/a0a6b435f9a049d488854669d2376038/downloads/data?format=geojson&spatialRefId=4326",
+        "live_results": "https://alamedacountyca.gov/rovresults/260/",
+        "election_page": "https://acvote.alamedacountyca.gov/election-information/elections?id=260"
+      },
+      "preliminary": true,
+      "status": {
+        "status": "Preliminary/Unofficial - Post Election Update #2",
+        "last_updated": "Monday, November 09, 2026; 4:59 PM",
+        "next_updates": [
+          "Friday, November 13, 2026",
+          "Monday, November 16, 2026"
+        ],
+        "registered": 983925,
+        "ballots_cast": 562851,
+        "turnout_pct": 57.2,
+        "precincts_reported": 627,
+        "precincts_total": 627,
+        "precincts_reported_pct": 100.0,
+        "portal_url": "https://alamedacountyca.gov/rovresults/260/",
+        "map_feed_url": "https://electionmaps.alamedacountyca.gov/json/electionResults.json",
+        "fetched_at": "2026-11-10T01:02:28-0800",
+        "reconciled": true,
+        "note": "Preliminary. Precinct-level figures come from the county's live results map feed and cover only the contests the county chooses to map; every other big race is countywide-only until the certified Statement of Vote is published. Per-precinct registration and turnout do not exist in either live feed."
+      },
+      "precinct_level_contests": [
+        "Measure RTM - Public Transit Revenue Measure District",
+        "U.S. Representative, 14th Congressional District"
+      ],
+      "n_county_only": 26
+    },
+    {
       "id": "2026-06-primary",
       "date": "2026-06-02",
       "name": "June 2, 2026 Direct Primary Election",
@@ -1828,12 +1906,5 @@
       }
     }
   ],
-  "pending": [
-    {
-      "id": "2026-11-general",
-      "date": "2026-11-03",
-      "name": "November 3, 2026 General Election",
-      "reason": "precinct canvass not published yet"
-    }
-  ]
+  "pending": []
 }

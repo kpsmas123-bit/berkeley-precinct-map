@@ -42,6 +42,26 @@
   .card { border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin:8px 0 16px; }
   .card.measure { background:#f3f7fb; border-color:#cfe0ee; }
   .card.note { background:#fff7e6; border-color:#f0d9a8; color:#8a5a00; font-size:12px; }
+  .card.prelim { background:#fff7e6; border-color:#f0d9a8; }
+  .card.prelim .lbl { color:#8a5a00; }
+  .card.prelim b.hdr { font-size:13.5px; color:#6b4500; }
+  .card.prelim .meta { font-size:11.5px; color:#8a5a00; line-height:1.5; margin-top:4px; }
+  #prelimChip { display:none; margin-top:8px; font-size:11px; background:#fff7e6;
+    border:1px solid #f0d9a8; color:#8a5a00; padding:6px 8px; border-radius:6px; line-height:1.45; }
+  .tabs { display:flex; gap:4px; margin:0 0 12px; border-bottom:1px solid var(--line); }
+  .tabs button { flex:1 1 0; font:inherit; font-size:12.5px; padding:7px 6px; cursor:pointer;
+    background:none; border:none; border-bottom:2px solid transparent; color:var(--muted); }
+  .tabs button.active { color:var(--ink); font-weight:600; border-bottom-color:var(--ink); }
+  .tabs button:focus-visible { outline:2px solid var(--above); outline-offset:-2px; }
+  .lrow { border-bottom:1px solid var(--line); padding:9px 2px; }
+  .lrow .top { display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+  .lrow .rn { font-weight:600; font-size:12.5px; }
+  .lrow .rv { font-size:12px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .lrow .sub2 { font-size:11px; color:var(--muted); margin-top:2px; }
+  .lrow .mapped { font-size:10px; text-transform:uppercase; letter-spacing:.4px;
+    color:#2166ac; border:1px solid #c5d9ea; background:#f3f7fb; border-radius:4px; padding:1px 4px; }
+  .lrow button.golink { font:inherit; font-size:11px; color:#2166ac; background:none;
+    border:none; padding:0; cursor:pointer; text-decoration:underline; }
   table.res { width:100%; border-collapse:collapse; font-size:13px; margin-top:4px; }
   table.res td { padding:3px 2px; border-bottom:1px solid var(--line); }
   table.res td.v { text-align:right; font-variant-numeric:tabular-nums; }
@@ -122,6 +142,7 @@
         <label for="choiceSel">Candidate / choice</label>
         <select id="choiceSel"></select>
       </div>
+      <div id="prelimChip"></div>
       <div id="partyNote" style="display:none;margin-top:8px;font-size:11px;background:#fff7e6;border:1px solid #f0d9a8;color:#8a5a00;padding:6px 8px;border-radius:6px"></div>
       <button class="ctrlbtn" id="resetView">⤢ Reset map view</button>
       <button class="ctrlbtn" id="shareBtn">🔗 Copy link to this map</button>
@@ -136,7 +157,8 @@
     <h2 id="aboutTitle">About this map</h2>
     <p>Precinct-level results for <b>every precinct in Alameda County</b>, limited to the
        contests that appear on essentially every ballot: statewide constitutional offices,
-       U.S. President / Senate / House, state propositions, and the 2021 gubernatorial recall.</p>
+       U.S. President / Senate / House, state propositions, region-wide district measures,
+       and the 2021 gubernatorial recall.</p>
     <p><b>Local races are deliberately left out.</b> A city council or school board race shown
        countywide is a mostly-empty map. Berkeley's local contests live on the
        <a href="./index.html">Berkeley precinct map</a>.</p>
@@ -153,6 +175,16 @@
           received the ballot, so those shares are within-party, not citywide.</li>
       <li><b>“Stands out”</b> flags precincts whose share differs from the countywide share by
           more than 3 points <i>and</i> beyond normal sampling noise — not merely a big-looking gap.</li>
+      <li><b>An election still being counted</b> is marked <i>preliminary</i> and built from the
+          county's two live feeds instead of a certified canvass: its results map, which carries
+          per-precinct votes for the one or two contests the county chooses to map, and its
+          results portal, which carries countywide totals for every race. The
+          <b>Latest county totals</b> tab lists all of them; the map shows the ones with
+          precinct figures. Neither feed carries per-precinct registration, so turnout is off
+          for those elections. Everything is superseded by the certified Statement of Vote.</li>
+      <li><b>Region-wide district measures</b> (a measure put to the whole county by a district
+          that spans it, such as the 2026 transit measure) are included. Measures from one city,
+          school or park district are not — they would leave the county map mostly empty.</li>
     </ul>
     <p style="font-size:12px;color:#6b6b6b">Tallies: Alameda County Registrar of Voters
        (Statement of Vote). Geometry: Alameda County Open Data Hub. Basemap: Esri, HERE,
@@ -208,8 +240,9 @@ const DEV_MAX = 0.15;      // ±15 pts saturates the diverging scale
 const MATERIAL = 0.03;     // 3-point materiality gate
 const OTHER = "Other candidates";
 
-const state = { election:null, contest:null, mode:"winner", choice:null,
+const state = { election:null, contest:null, mode:"winner", choice:null, tab:"map",
                 city:null, focus:null, results:null, catalog:null, manifest:null, _geo:null };
+const TABS = ["map","latest"];
 let map, elections, citiesGeo;
 
 const slug = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
@@ -289,6 +322,12 @@ function resolveChoice(slugged, choices){
 }
 function choiceValid(){ return state.choice && (cat().choices||[]).includes(state.choice); }
 function leadingChoice(){ const t=topChoices(); return t[0] || (cat().choices||[])[0] || null; }
+/* An election built from the county's live feeds rather than a certified Statement
+   of Vote. Only the contests the county chooses to map have precinct figures; the
+   rest are countywide totals, which is what the "Latest county totals" tab shows. */
+const isPrelim = () => !!(state.results && state.results.preliminary);
+const prelimStatus = () => (state.results && state.results.status) || {};
+const countyOnly = () => (state.results && state.results.county_only) || [];
 function hasTurnout(){ const P=state.results.precincts;
   return Object.values(P).some(p=>p.registered>0); }
 const overReg = p => p.registered && p.ballots_cast > p.registered;
@@ -306,7 +345,8 @@ async function boot(){
   catch(e){ citiesGeo = null; }
 
   const esel = document.getElementById("electionSel");
-  elections.forEach(e=> esel.add(new Option(e.name, e.id)));
+  elections.forEach(e=> esel.add(new Option(
+    e.name + (e.preliminary? "  — preliminary" : ""), e.id)));
 
   map = new maplibregl.Map({
     container:"map",
@@ -363,9 +403,10 @@ function parseHash(){
   state.election=eid;
   state._pendingContest = parts[1]||null;
   state.mode = MODES.includes(parts[2]) ? parts[2] : "winner";
-  state._pendingChoice = null; state._pendingCity = null;
+  state._pendingChoice = null; state._pendingCity = null; state.tab = "map";
   for(const t of parts.slice(3)){
     if(t.startsWith("c-")) state._pendingChoice = t.slice(2);
+    else if(t.startsWith("t-")) state.tab = TABS.includes(t.slice(2))? t.slice(2) : "map";
     else state._pendingCity = t;
   }
 }
@@ -373,6 +414,7 @@ function updateHash(){
   const p=[state.election, slug(state.contest||""), state.mode];
   if((state.mode==="choice"||state.mode==="deviation") && state.choice)
     p.push("c-"+bareSlug(state.choice));   // party-free: durable across cycles
+  if(state.tab!=="map" && isPrelim()) p.push("t-"+state.tab);
   if(state.city) p.push(slug(state.city));
   const h="#"+p.join("/");
   if(location.hash!==h) history.replaceState(null,"",h);
@@ -402,6 +444,7 @@ window.addEventListener("hashchange", async ()=>{
     if(m) state.choice=m;
     state._pendingChoice=null;
   }
+  if(!isPrelim()) state.tab="map";
   state.city = state._pendingCity
     ? (Object.keys(state.results.cities).find(c=>slug(c)===state._pendingCity) || null)
     : null;
@@ -441,6 +484,7 @@ function fitTo(features, duration){
 /* ---------- load one election ---------- */
 async function loadElection(id){
   state.election = id;
+  state.tab = "map";
   const meta = elections.find(e=>e.id===id);
   document.getElementById("panel").innerHTML = `<div style="color:#6b6b6b;font-size:13px">Loading ${esc(meta.name)}…</div>`;
 
@@ -552,13 +596,14 @@ function defaultContest(){
 
 const CATLABEL = { federal:"Federal", statewide:"Statewide offices",
                    proposition:"State propositions", recall:"Statewide recall",
+                   regional:"Region-wide district measures",
                    legislative:"State legislature", judicial:"Judicial retention", county:"County" };
 function buildContestPicker(){
   const sel=document.getElementById("contestSel");
   sel.innerHTML="";
   const groups={};
   for(const [n,c] of Object.entries(state.catalog)) (groups[c.category||"other"] ||= []).push(n);
-  for(const key of ["federal","statewide","recall","proposition","legislative","judicial","county","other"]){
+  for(const key of ["federal","statewide","recall","proposition","regional","legislative","judicial","county","other"]){
     if(!groups[key]) continue;
     const og=document.createElement("optgroup");
     og.label = CATLABEL[key] || "Other";
@@ -580,6 +625,17 @@ function render(){
   tb.disabled = noTurnout;
   tb.title = noTurnout? "This election's canvass has no registration column" : "";
   if(noTurnout && state.mode==="turnout"){ state.mode="winner"; syncModes(); }
+
+  const pc=document.getElementById("prelimChip");
+  if(isPrelim()){
+    const st=prelimStatus(), other=countyOnly().length;
+    pc.style.display="block";
+    pc.innerHTML = `⏳ <b>${esc(st.status||"Preliminary")}</b>`
+      + (st.last_updated? ` · ${esc(st.last_updated)}`:"")
+      + `<br>Only ${Object.keys(state.catalog).length} race${Object.keys(state.catalog).length===1?"":"s"} `
+      + `${Object.keys(state.catalog).length===1?"has":"have"} precinct figures yet`
+      + (other? ` — the other ${other} are in the <b>Latest county totals</b> tab.`:".");
+  } else pc.style.display="none";
 
   const pn=document.getElementById("partyNote");
   if(isParty(state.contest)){
@@ -729,11 +785,109 @@ function metricFor(choices, reg, cast){
   return {txt:`${w} ${fpct(pct(v,d))}`, v:v/d};
 }
 
+
+/* ---------- preliminary (live-feed) election: status + "latest totals" tab -----
+   Between election night and certification the county publishes two feeds: a
+   results map carrying PER-PRECINCT votes for the one or two contests it chooses
+   to map, and a results portal carrying COUNTYWIDE totals for every race. The map
+   tab shows the first; this tab shows both together, so the latest numbers for
+   every big race are readable while most of them still have no geography. ------*/
+function prelimBanner(){
+  const st=prelimStatus(), T=(state.results.turnout||{}).county||{};
+  const mapped=(st.precinct_level_contests||Object.keys(state.catalog)).length;
+  const other=countyOnly().length;
+  const next=(st.next_updates||[])[0];
+  const srcs=[];
+  if(st.map_feed_url) srcs.push(`<a class="src" href="${esc(st.map_feed_url)}" target="_blank" rel="noopener">results-map feed</a>`);
+  if(st.portal_url) srcs.push(`<a class="src" href="${esc(st.portal_url)}" target="_blank" rel="noopener">results portal</a>`);
+  return `<div class="card prelim">`
+    + `<div class="lbl">Count still running</div>`
+    + `<b class="hdr">${esc(st.status||"Preliminary / unofficial")}</b>`
+    + (st.last_updated? `<div class="meta">County last updated <b>${esc(st.last_updated)}</b>.</div>`:"")
+    + `<div class="meta">`
+      + (st.precincts_total? `${fmt(st.precincts_reported)} of ${fmt(st.precincts_total)} precincts reporting (${st.precincts_reported_pct}%). ` : "")
+      + (T.registered? `Turnout so far <b>${fpct(pct(T.ballots_cast,T.registered))}</b> — ${fmt(T.ballots_cast)} of ${fmt(T.registered)} registered.` : "")
+    + `</div>`
+    + `<div class="meta"><b>${mapped}</b> race${mapped===1?"":"s"} ${mapped===1?"has":"have"} precinct-level figures`
+      + (other? `; <b>${other}</b> more ${other===1?"is":"are"} countywide-only until the certified Statement of Vote is published.`:".")
+      + `</div>`
+    + (next? `<div class="meta">Next county update: <b>${esc(next)}</b>.</div>`:"")
+    + `<div class="meta">Per-precinct registration and turnout are not in either live feed, so
+        the turnout map is off for this election.${st.reconciled===false? " <b>⚠ Precinct sums do not match the county's own totals</b> — treat with care." : ""}</div>`
+    + (srcs.length? `<div class="meta">Source: ${srcs.join(" · ")}</div>`:"")
+    + `</div>`;
+}
+
+function tabStrip(){
+  const other=countyOnly().length;
+  const t=(id,label)=>`<button data-tab="${id}" class="${state.tab===id?"active":""}">${label}</button>`;
+  return `<div class="tabs">`
+    + t("map","Precinct detail")
+    + t("latest",`Latest county totals${other?` (${other+Object.keys(state.catalog).length})`:""}`)
+    + `</div>`;
+}
+
+function latestRow(name, choices, extra, mapped){
+  // choices: [{choice, votes, pct}] already ordered by the source; sort by votes
+  const rows=[...choices].sort((a,b)=>b.votes-a.votes);
+  const total=rows.reduce((a,r)=>a+r.votes,0);
+  const lead=rows[0]||{choice:"—",votes:0,pct:0};
+  const second=rows[1];
+  const isYN=rows.length===2 && rows.some(r=>/^(bonds\s+)?yes$/i.test(r.choice));
+  const col=isYN? (/^(bonds\s+)?yes$/i.test(lead.choice)? YESNO.YES : YESNO.NO) : CAT[0];
+  const share=total? 100*lead.votes/total : 0;
+  return `<div class="lrow">`
+    + `<div class="top"><span class="rn">${esc(name)}`
+      + (mapped? ` <span class="mapped">mapped</span>`:"")
+      + `</span>`
+      + `<span class="rv"><b>${esc(lead.choice)}</b> ${share.toFixed(1)}%</span></div>`
+    + `<div class="bar"><span style="width:${share.toFixed(1)}%;background:${col}"></span></div>`
+    + `<div class="sub2">${fmt(total)} votes`
+      + (second? ` · ${esc(second.choice)} ${(total?100*second.votes/total:0).toFixed(1)}%`:"")
+      + (rows.length>2? ` · ${rows.length} choices`:"")
+      + (extra? ` · ${esc(extra)}`:"")
+      + (mapped? ` · <button class="golink" data-contest="${esc(name)}">show on map →</button>`:"")
+      + `</div></div>`;
+}
+
+function latestView(meta){
+  const groups={};
+  // the precinct-mapped contests first, flagged, then everything countywide-only
+  for(const n of Object.keys(state.catalog)){
+    const ct=countyTotal(n);
+    const choices=Object.entries(ct.choices||{}).map(([c,v])=>({choice:c,votes:v}));
+    if(!choices.length) continue;
+    (groups[state.catalog[n].category||"other"] ||= []).push({name:n, choices, mapped:true});
+  }
+  for(const c of countyOnly())
+    (groups[c.category||"other"] ||= []).push({name:c.name, choices:c.choices,
+      extra:c.threshold||"", mapped:false});
+
+  const order=["federal","statewide","recall","proposition","regional","legislative","judicial","county","other"];
+  const body=order.filter(k=>groups[k]).map(k=>
+      `<div class="lbl" style="margin-top:16px">${esc(CATLABEL[k]||"Other")}</div>`
+      + groups[k].map(r=>latestRow(r.name,r.choices,r.extra,r.mapped)).join("")).join("");
+
+  return `<div class="dhead"><h2>Latest county totals</h2>`
+    + `<span class="mem">${fmt(Object.values(groups).reduce((a,g)=>a+g.length,0))} races</span></div>`
+    + `<div class="vintage">${esc(meta.name)} · countywide, as last published by the Registrar</div>`
+    + prelimBanner()
+    + body
+    + `<div style="font-size:11px;color:#6b6b6b;margin-top:14px">Every figure here is a
+        <b>countywide</b> total. Races marked “mapped” are the ones the county publishes
+        precinct by precinct, so those also work in the map tab with the full set of
+        modes. The rest get precinct figures when the Statement of Vote is certified,
+        which is also when these numbers become final.</div>`;
+}
+
 function buildPanel(){
   const el=document.getElementById("panel");
   const c=cat(), meta=elections.find(e=>e.id===state.election);
-  const head = state.city ? cityView(c,meta) : countyView(c,meta);
-  el.innerHTML = head + creditBlock(meta);
+  const prelim=isPrelim();
+  const body = (prelim && state.tab==="latest")
+    ? latestView(meta)
+    : (prelim? prelimBanner() : "") + (state.city ? cityView(c,meta) : countyView(c,meta));
+  el.innerHTML = (prelim? tabStrip() : "") + body + creditBlock(meta);
   wirePanel();
 }
 
@@ -862,9 +1016,10 @@ function creditBlock(meta){
     <b>${esc(meta.name)}</b><br>
     Contests shown: statewide offices, Congress and state propositions only — see the
     <a href="./index.html" class="src">Berkeley map</a> for local races.<br>
-    Tallies: Alameda County Registrar of Voters, Statement of Vote${s.election_page?` (<a class="src" href="${esc(s.election_page)}" target="_blank" rel="noopener">election page</a>)`:""}.<br>
+    Tallies: ${isPrelim()? "Alameda County Registrar of Voters, live results feeds (preliminary)"
+      : "Alameda County Registrar of Voters, Statement of Vote"}${s.election_page?` (<a class="src" href="${esc(s.election_page)}" target="_blank" rel="noopener">election page</a>)`:""}.<br>
     Precinct geometry: Alameda County Open Data Hub, as published for this election.<br>
-    Basemap © OpenStreetMap contributors, © CARTO.
+    Basemap: Esri, HERE, Garmin, © OpenStreetMap contributors.
     ${(state.manifest.pending||[]).length? `<br><br><b>Not yet mappable:</b> `
       + (state.manifest.pending||[]).map(p=>`${esc(p.name)} — ${esc(p.reason)}`).join("; ")+"." : ""}
   </div>`;
@@ -884,6 +1039,17 @@ function wirePanel(){
     state.focus=b.dataset.pid; render();
     const f=state._geo.features.find(x=>x.properties.precinct===state.focus);
     if(f) fitTo([f]);
+  });
+  document.querySelectorAll('.tabs button[data-tab]').forEach(b=> b.onclick=()=>{
+    if(state.tab===b.dataset.tab) return;
+    state.tab=b.dataset.tab; render();
+  });
+  document.querySelectorAll('.lrow button.golink').forEach(b=> b.onclick=()=>{
+    const n=b.dataset.contest;
+    if(!(n in state.catalog)) return;
+    state.contest=n; state.choice=null; state.city=null; state.focus=null; state.tab="map";
+    document.getElementById("contestSel").value=n;
+    render(); fitToContest();
   });
 }
 

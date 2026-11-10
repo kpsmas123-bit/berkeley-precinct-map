@@ -5,9 +5,11 @@ first. One entry per election that actually has a built county results file, new
 first, carrying the contest list so the frontend can populate its pickers without
 fetching every election's results.
 
-Also records, for an election whose precinct canvass is still pending, that it is
-knowingly absent from the county map (with the reason), so the UI can say so instead
-of silently skipping it.
+An election built in PRELIMINARY mode (live feeds, no certified canvass yet) carries
+`preliminary: true` plus the county's own status banner, so the picker can label it
+and the panel can state which count it is showing without first loading results. One
+with neither a certified canvass nor a usable live feed is recorded under `pending`
+with the reason, so the UI can say so instead of silently skipping it.
 
 Usage: build_county_manifest.py
 """
@@ -32,13 +34,14 @@ def main():
                                 "reason": "precinct canvass not published yet"})
             continue
         r = json.load(open(res))
+        prelim = bool(r.get("preliminary"))
         contests = [{"name": n,
                      "category": c.get("category"),
                      "kind": c.get("kind"),
                      "rcv": bool(c.get("rcv")),
                      "choices": c.get("choices", [])}
                     for n, c in r["contests"].items()]
-        entries.append({
+        entry = {
             "id": e["id"],
             "date": e["date"],
             "name": e["name"],
@@ -49,7 +52,18 @@ def main():
             "cities": sorted(r["cities"].keys()),
             "contests": contests,
             "sources": e.get("sources", {}),
-        })
+        }
+        if prelim:
+            st = r.get("status", {})
+            entry["preliminary"] = True
+            entry["status"] = {k: st.get(k) for k in (
+                "status", "last_updated", "next_updates", "registered", "ballots_cast",
+                "turnout_pct", "precincts_reported", "precincts_total",
+                "precincts_reported_pct", "portal_url", "map_feed_url", "fetched_at",
+                "reconciled", "note") if st.get(k) is not None}
+            entry["precinct_level_contests"] = st.get("precinct_level_contests", [])
+            entry["n_county_only"] = len(r.get("county_only", []))
+        entries.append(entry)
 
     out = {
         "scope": "county",
@@ -66,7 +80,12 @@ def main():
     print(f"  county manifest: {len(entries)} elections"
           + (f", {len(pending)} pending" if pending else "") + f" -> {OUT}")
     for e in entries:
-        print(f"    {e['id']:<18} {e['n_precincts']:>4} precincts  {e['n_contests']:>3} contests")
+        tag = ""
+        if e.get("preliminary"):
+            tag = (f"  PRELIMINARY — {e['status'].get('status','')}"
+                   f" ({e.get('n_county_only',0)} more countywide-only)")
+        print(f"    {e['id']:<18} {e['n_precincts']:>4} precincts  "
+              f"{e['n_contests']:>3} contests{tag}")
     for p in pending:
         print(f"    {p['id']:<18} pending — {p['reason']}")
 

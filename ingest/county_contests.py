@@ -23,6 +23,7 @@ ENABLED = {
     "federal",       # president, U.S. Senate, U.S. House
     "proposition",   # state propositions
     "recall",        # the 2021 statewide gubernatorial recall
+    "regional",      # measures put to the whole county by a region-wide district
 }
 
 # Available but off by default — these are not on every county ballot, or add bulk
@@ -54,6 +55,15 @@ PATTERNS = [
 
     # ---- state propositions ----------------------------------------------------
     ("proposition", r"^(state\s+)?proposition\s+\d+.*"),
+
+    # ---- region-wide district measures -----------------------------------------
+    # A measure from a district that spans the entire county (and beyond) is on
+    # (nearly) every county ballot, so it maps as meaningfully as a state
+    # proposition. Matched by exact jurisdiction rather than by a loose "district"
+    # rule, because most district measures cover one school or park district and
+    # would leave the county map 95% empty. A new region-wide measure needs its own
+    # line here — deliberately, so adding one is a decision rather than a side effect.
+    ("regional", r"^(bond\s+)?measure\s+\S+\s*-\s*public transit revenue measure district$"),
 
     # ---- 2021 statewide gubernatorial recall -----------------------------------
     ("recall", r"^recall gavin newsom$"),
@@ -92,7 +102,7 @@ def included(name: str) -> bool:
 
 
 # Display order for the contest picker: top-of-ticket first, then props.
-CATEGORY_ORDER = ["federal", "statewide", "recall", "proposition",
+CATEGORY_ORDER = ["federal", "statewide", "recall", "proposition", "regional",
                   "legislative", "judicial", "county"]
 
 
