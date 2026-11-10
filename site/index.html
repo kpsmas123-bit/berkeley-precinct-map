@@ -401,6 +401,22 @@ async function boot() {
     if(map.isStyleLoaded() || _t++ > 75){ clearInterval(_poll); init(); }
   }, 400);
 }
+/* Back/forward, an edited address bar, or — when embedded — the parent page
+   pointing the iframe at a different view, all arrive as a hashchange. Without
+   this the app only read the hash once at boot, so a pasted link did nothing
+   until a manual reload. updateHash() uses replaceState, which does not fire
+   hashchange, so there is no feedback loop. */
+window.addEventListener("hashchange", async ()=>{
+  if(!window._ready) return;
+  const prev = state.election;
+  parseHash();
+  const esel=document.getElementById("electionSel");
+  if(esel) esel.value = state.election;
+  if(state.election !== prev){ state.contest=null; state.focus=null; await loadElection(state.election); return; }
+  state.focus=null;
+  render();          // render() resolves _pendingContestSlug / _pendingChoiceSlug
+});
+
 function eachCoord(geom, fn){ const walk=a=>{ if(typeof a[0]==="number") fn(a); else a.forEach(walk); }; walk(geom.coordinates); }
 function fitToPrecincts(duration){
   if(!state._geo || !state._geo.features.length) return;

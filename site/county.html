@@ -379,6 +379,38 @@ function updateHash(){
   notifyParent();
 }
 
+/* Back/forward, an edited address bar, or — when embedded — the parent page
+   pointing the iframe at a different view, all arrive as a hashchange. Without
+   this the app only ever read the hash once at boot, so a pasted link did
+   nothing until a manual reload. updateHash() uses replaceState, which does not
+   fire hashchange, so there is no feedback loop. */
+window.addEventListener("hashchange", async ()=>{
+  if(!window._ready) return;
+  const prev = state.election;
+  parseHash();
+  const esel=document.getElementById("electionSel");
+  if(esel) esel.value = state.election;
+  syncModes();
+  if(state.election !== prev){ state.focus=null; await loadElection(state.election); return; }
+  if(state._pendingContest){
+    const m=Object.keys(state.catalog).find(n=>slug(n)===state._pendingContest);
+    if(m) state.contest=m;
+    state._pendingContest=null;
+  }
+  if(state._pendingChoice){
+    const m=resolveChoice(state._pendingChoice, (state.catalog[state.contest]||{}).choices||[]);
+    if(m) state.choice=m;
+    state._pendingChoice=null;
+  }
+  state.city = state._pendingCity
+    ? (Object.keys(state.results.cities).find(c=>slug(c)===state._pendingCity) || null)
+    : null;
+  state._pendingCity=null; state.focus=null;
+  document.getElementById("contestSel").value = state.contest;
+  render();
+  fitToContest();
+});
+
 function eachCoord(geom,fn){ const walk=a=>{ if(typeof a[0]==="number") fn(a); else a.forEach(walk); }; walk(geom.coordinates); }
 function fitTo(features, duration){
   if(!features || !features.length) return;
