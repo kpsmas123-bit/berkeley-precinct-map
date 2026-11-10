@@ -11,6 +11,12 @@ county map had nothing at all for it. But the county does publish two machine-re
 live feeds in the meantime, and between them there is real precinct-level analysis to
 be had:
 
+  0. a Cast Vote Record export, when one has been obtained (--from-cvr, parsed by
+     ingest/parse_cvr.py). This is the best of the three: one record per ballot, every
+     contest, with the precinct on it. When it is supplied, the results-map feed is
+     not used at all — the CVR covers every contest the feed would have, and many it
+     would not.
+
   1. electionmaps.alamedacountyca.gov/json/electionResults.json
      The feed behind the county's own results map. Carries PER-PRECINCT votes, but
      only for the one or two contests the county chooses to map (Nov 2026: U.S.
@@ -43,9 +49,16 @@ Honesty constraints baked in
 * Nothing here is written into a certified results file. Re-running ./build_county.sh
   <id> after certification overwrites this file by the normal path.
 
+With a CVR the only thing still missing is the county's own status banner and
+countywide registration, so the portal is still read for those — and the CVR's
+precinct sums are reconciled against the portal's countywide totals, which is a far
+stronger check than the results-map feed could offer. The two are snapshots taken at
+different moments, so a small shortfall is expected and reported rather than hidden.
+
 Usage:
   fetch_live_county.py <election_id> <county_geo.geojson> <out.json>
-                       [--rov-id N] [--map-url URL] [--portal-url URL]
+                       [--rov-id N] [--from-cvr parsed_cvr.json]
+                       [--map-url URL] [--portal-url URL]
                        [--overrides path] [--no-portal]
 """
 import json
@@ -57,6 +70,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from county_contests import category, included, sort_key  # noqa: E402
+from filter_county_results import cities_from_contests  # noqa: E402
 import live_map_feed  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -186,6 +200,34 @@ def parse_portal(html):
 # the same feed, so there is one parser rather than two that can drift apart.
 
 
+def from_cvr(cvr):
+    """Shape a parsed CVR like parse_map_feed's output, keeping the big contests.
+
+    A precinct whose cards were all redacted under 2 CCR 20126 has a contest row but
+    no choices; it is left out of `mapped` so the map shows it as no-data rather than
+    as a precinct where nobody voted.
+    """
+    cat = cvr.get("contests", {})
+    mapped, meta = {}, {}
+    for name, c in cat.items():
+        if not included(name):
+            continue
+        per = {}
+        for pid, p in cvr.get("precincts", {}).items():
+            e = (p.get("contests") or {}).get(name)
+            if not e:
+                continue
+            ch = {k: v for k, v in (e.get("choices") or {}).items() if v}
+            if ch:
+                per[str(pid)] = ch
+        if not per:
+            continue
+        mapped[name] = per
+        meta[name] = {"rcv": bool(c.get("rcv")), "kind": c.get("kind", "candidate"),
+                      "choices": c.get("choices", []), "feed_totals": {}}
+    return mapped, meta, {}
+
+
 def agg(entries):
     out = {"choices": {}}
     for e in entries:
@@ -218,13 +260,42 @@ def main():
     for pid, _, c in applied:
         city_of[pid] = c
 
-    # ---- feed 1: precinct-level races the county maps live ----------------------
-    map_url = opt.get("map-url") or MAP_FEED
-    feed = live_map_feed.fetch(map_url)
-    mapped, meta, reporting = live_map_feed.parse(feed)
-    if not mapped:
-        print(f"ERROR: no precinct-level races in {map_url}", file=sys.stderr)
-        sys.exit(1)
+    # ---- precinct-level source: a CVR if we have one, else the live map feed ----
+    cvr, feed, map_url = None, {}, None
+    if opt.get("from-cvr"):
+        cvr = json.load(open(opt["from-cvr"]))
+        mapped, meta, reporting = from_cvr(cvr)
+        if not mapped:
+            print(f"ERROR: no big contests in {opt['from-cvr']}", file=sys.stderr)
+            sys.exit(1)
+        # A CVR carries every local contest, so jurisdiction can be inferred from the
+        # ballot the way a certified build does, instead of leaning on geometry plus
+        # corrections carried forward from an earlier election.
+        city_names = sorted({c for c in geo_city.values() if c != UNINC})
+        for pid, p in cvr.get("precincts", {}).items():
+            if pid not in geo_city:
+                continue
+            hits = cities_from_contests(p.get("contests", {}).keys(), city_names)
+            if len(hits) == 1:
+                city = next(iter(hits))
+            elif len(hits) > 1:
+                g = geo_city[pid]
+                city = g if g in hits else max(hits, key=hits.get)
+            else:
+                continue
+            if city != city_of.get(pid):
+                applied = [a for a in applied if a[0] != pid]
+                if city != geo_city[pid]:
+                    applied.append((pid, geo_city[pid], city))
+            city_of[pid] = city
+        applied.sort()
+    else:
+        map_url = opt.get("map-url") or MAP_FEED
+        feed = live_map_feed.fetch(map_url)
+        mapped, meta, reporting = live_map_feed.parse(feed)
+        if not mapped:
+            print(f"ERROR: no precinct-level races in {map_url}", file=sys.stderr)
+            sys.exit(1)
 
     unknown = {p for pr in mapped.values() for p in pr} - set(geo_city)
     if unknown:
@@ -244,13 +315,33 @@ def main():
             sys.exit(1)
         banner, portal = parse_portal(fetch(purl))
         banner["portal_url"] = purl
-    banner["map_feed_url"] = map_url
+    if map_url:
+        banner["map_feed_url"] = map_url
+        if feed.get("lastUpdatedDateTime"):
+            banner["map_feed_updated"] = feed["lastUpdatedDateTime"]
     banner.setdefault("status", "Preliminary/Unofficial")
-    if feed.get("lastUpdatedDateTime"):
-        banner["map_feed_updated"] = feed["lastUpdatedDateTime"]
 
-    # reconcile precinct sums against the feed's own countywide candidate totals
-    recon = live_map_feed.reconcile(mapped, meta)
+    # Reconcile precinct sums against the best countywide totals available. For the
+    # map feed that is the feed's own totals, which must match exactly. For a CVR it
+    # is the portal — a snapshot taken at a different moment, so the CVR is expected
+    # to be at or a little below the portal, and the gap is reported rather than
+    # hidden. A CVR ahead of the portal means the export is the newer count.
+    if cvr is None:
+        recon = live_map_feed.reconcile(mapped, meta)
+    else:
+        portal_by_name = {c["name"]: c for c in portal}
+        recon = {}
+        for n, pr in mapped.items():
+            got = sum(v for ch in pr.values() for v in ch.values())
+            pc = portal_by_name.get(n)
+            if not pc:
+                recon[n] = {"ok": None, "cvr_votes": got,
+                            "note": "not reported by the portal"}
+                continue
+            want = sum(r["votes"] for r in pc["choices"])
+            recon[n] = {"ok": True, "cvr_votes": got, "portal_votes": want,
+                        "delta": got - want,
+                        "delta_pct": round(100 * (got - want) / want, 3) if want else None}
 
     # ---- assemble, in the shape a certified build produces ---------------------
     contests = {}
@@ -283,7 +374,7 @@ def main():
                           if any(n in precincts[p]["contests"] for p in pids)}
 
     # every other big race: countywide numbers, no geography
-    county_only = [c for c in portal
+    county_only = [dict(c) for c in portal
                    if included(c["name"]) and c["name"] not in contests]
     for c in county_only:
         c["category"] = category(c["name"])
@@ -302,11 +393,13 @@ def main():
                                "ballots_cast": banner.get("ballots_cast", 0)},
                     "cities": {}},
         "county_only": county_only,
+        **({"cvr": cvr.get("cvr", {})} if cvr else {}),
         "status": {
             **{k: v for k, v in banner.items()},
             "fetched_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
             "precinct_level_contests": sorted(contests),
-            "reconciled": all(r["ok"] for r in recon.values()),
+            "reconciled": all(r["ok"] is not False for r in recon.values()),
+            "precinct_source": "cast_vote_record" if cvr else "results_map_feed",
             "reconciliation": recon,
             "city_assignment": "geometric, with ballot-derived corrections carried "
                                "forward from certified builds by precinct id",
@@ -331,14 +424,21 @@ def main():
     if banner.get("next_updates"):
         print(f"    next county update: {banner['next_updates'][0]}")
     print(f"  preliminary county results -> {out_path} ({mb:.2f} MB)")
-    print(f"    precinct-level ({len(contests)}):")
+    src = "cast vote record" if cvr else "results-map feed"
+    print(f"    precinct-level from the {src} ({len(contests)}):")
     for n in contests:
         got = sum(1 for p in precincts.values() if n in p["contests"])
         tot = county_totals[n]["choices"]
         lead = max(tot, key=tot.get) if tot else "—"
         d = sum(tot.values()) or 1
-        flag = "" if recon[n]["ok"] else "  ⚠ does not reconcile with feed totals"
-        print(f"      {n[:56]:<56} {got:>4} precincts  {lead[:24]:<24} "
+        r = recon[n]
+        if r.get("ok") is False:
+            flag = "  ⚠ does not reconcile"
+        elif cvr and r.get("delta_pct") is not None:
+            flag = f"  ({r['delta_pct']:+.2f}% vs portal)"
+        else:
+            flag = ""
+        print(f"      {n[:48]:<48} {got:>4} pct  {lead[:22]:<22} "
               f"{100*tot.get(lead,0)/d:>5.1f}%{flag}")
     print(f"    countywide-only ({len(county_only)}): "
           + ", ".join(c["name"][:34] for c in county_only[:6])

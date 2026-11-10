@@ -11,7 +11,7 @@
       "results": "results/2026-11-general.json",
       "geo": "geo/2026-11-general.geojson",
       "n_precincts": 627,
-      "n_contests": 2,
+      "n_contests": 28,
       "cities": [
         "Alameda",
         "Albany",
@@ -31,13 +31,274 @@
       ],
       "contests": [
         {
+          "name": "U.S. Representative, 10th Congressional District",
+          "category": "federal",
+          "kind": "candidate",
+          "rcv": false,
+          "choices": [
+            "MARK DESAULNIER",
+            "JEFF FRESE"
+          ]
+        },
+        {
+          "name": "U.S. Representative, 12th Congressional District",
+          "category": "federal",
+          "kind": "candidate",
+          "rcv": false,
+          "choices": [
+            "JAMIE JOYCE",
+            "LATEEFAH SIMON"
+          ]
+        },
+        {
           "name": "U.S. Representative, 14th Congressional District",
           "category": "federal",
           "kind": "candidate",
           "rcv": false,
           "choices": [
-            "Melissa Hernandez",
-            "Aisha Wahab"
+            "MELISSA HERNANDEZ",
+            "AISHA WAHAB"
+          ]
+        },
+        {
+          "name": "U.S. Representative, 17th Congressional District",
+          "category": "federal",
+          "kind": "candidate",
+          "rcv": false,
+          "choices": [
+            "RO KHANNA",
+            "RITESH TANDON"
+          ]
+        },
+        {
+          "name": "Attorney General",
+          "category": "statewide",
+          "kind": "candidate",
+          "rcv": false,
+          "choices": [
+            "ROB BONTA",
+            "MICHAEL E. GATES"
+          ]
+        },
+        {
+          "name": "Controller",
+          "category": "statewide",
+          "kind": "candidate",
+          "rcv": false,
+          "choices": [
+            "MALIA M. COHEN",
+            "HERB W MORGAN"
+          ]
+        },
+        {
+          "name": "Governor",
+          "category": "statewide",
+          "kind": "candidate",
+          "rcv": false,
+          "choices": [
+            "STEVE HILTON",
+            "XAVIER BECERRA"
+          ]
+        },
+        {
+          "name": "Insurance Commissioner",
+          "category": "statewide",
+          "kind": "candidate",
+          "rcv": false,
+          "choices": [
+            "JANE KIM",
+            "BEN ALLEN"
+          ]
+        },
+        {
+          "name": "Lieutenant Governor",
+          "category": "statewide",
+          "kind": "candidate",
+          "rcv": false,
+          "choices": [
+            "GLORIA ROMERO",
+            "FIONA MA"
+          ]
+        },
+        {
+          "name": "Member, State Board of Equalization, 2nd District",
+          "category": "statewide",
+          "kind": "candidate",
+          "rcv": false,
+          "choices": [
+            "JOHN PIMENTEL",
+            "SALLY J. LIEBER"
+          ]
+        },
+        {
+          "name": "Secretary of State",
+          "category": "statewide",
+          "kind": "candidate",
+          "rcv": false,
+          "choices": [
+            "DONALD P. (DON) WAGNER",
+            "SHIRLEY N. WEBER"
+          ]
+        },
+        {
+          "name": "State Superintendent of Public Instruction",
+          "category": "statewide",
+          "kind": "candidate",
+          "rcv": false,
+          "choices": [
+            "SONJA SHAW",
+            "RICHARD BARRERA",
+            "Write-in"
+          ]
+        },
+        {
+          "name": "Treasurer",
+          "category": "statewide",
+          "kind": "candidate",
+          "rcv": false,
+          "choices": [
+            "JENNIFER HAWKS",
+            "ELENI KOUNALAKIS"
+          ]
+        },
+        {
+          "name": "Proposition 1",
+          "category": "proposition",
+          "kind": "measure",
+          "rcv": false,
+          "choices": [
+            "YES",
+            "NO"
+          ]
+        },
+        {
+          "name": "Proposition 2",
+          "category": "proposition",
+          "kind": "measure",
+          "rcv": false,
+          "choices": [
+            "YES",
+            "NO"
+          ]
+        },
+        {
+          "name": "Proposition 3",
+          "category": "proposition",
+          "kind": "measure",
+          "rcv": false,
+          "choices": [
+            "YES",
+            "NO"
+          ]
+        },
+        {
+          "name": "Proposition 4",
+          "category": "proposition",
+          "kind": "measure",
+          "rcv": false,
+          "choices": [
+            "YES",
+            "NO"
+          ]
+        },
+        {
+          "name": "Proposition 5",
+          "category": "proposition",
+          "kind": "measure",
+          "rcv": false,
+          "choices": [
+            "YES",
+            "NO"
+          ]
+        },
+        {
+          "name": "Proposition 37",
+          "category": "proposition",
+          "kind": "measure",
+          "rcv": false,
+          "choices": [
+            "YES",
+            "NO"
+          ]
+        },
+        {
+          "name": "Proposition 38",
+          "category": "proposition",
+          "kind": "measure",
+          "rcv": false,
+          "choices": [
+            "YES",
+            "NO"
+          ]
+        },
+        {
+          "name": "Proposition 39",
+          "category": "proposition",
+          "kind": "measure",
+          "rcv": false,
+          "choices": [
+            "YES",
+            "NO"
+          ]
+        },
+        {
+          "name": "Proposition 40",
+          "category": "proposition",
+          "kind": "measure",
+          "rcv": false,
+          "choices": [
+            "YES",
+            "NO"
+          ]
+        },
+        {
+          "name": "Proposition 41",
+          "category": "proposition",
+          "kind": "measure",
+          "rcv": false,
+          "choices": [
+            "YES",
+            "NO"
+          ]
+        },
+        {
+          "name": "Proposition 42",
+          "category": "proposition",
+          "kind": "measure",
+          "rcv": false,
+          "choices": [
+            "YES",
+            "NO"
+          ]
+        },
+        {
+          "name": "Proposition 43",
+          "category": "proposition",
+          "kind": "measure",
+          "rcv": false,
+          "choices": [
+            "YES",
+            "NO"
+          ]
+        },
+        {
+          "name": "Proposition 44",
+          "category": "proposition",
+          "kind": "measure",
+          "rcv": false,
+          "choices": [
+            "YES",
+            "NO"
+          ]
+        },
+        {
+          "name": "Proposition 45",
+          "category": "proposition",
+          "kind": "measure",
+          "rcv": false,
+          "choices": [
+            "YES",
+            "NO"
           ]
         },
         {
@@ -46,8 +307,8 @@
           "kind": "measure",
           "rcv": false,
           "choices": [
-            "Yes",
-            "No"
+            "YES",
+            "NO"
           ]
         }
       ],
@@ -71,16 +332,41 @@
         "precincts_total": 627,
         "precincts_reported_pct": 100.0,
         "portal_url": "https://alamedacountyca.gov/rovresults/260/",
-        "map_feed_url": "https://electionmaps.alamedacountyca.gov/json/electionResults.json",
-        "fetched_at": "2026-11-10T01:02:28-0800",
+        "fetched_at": "2026-11-10T10:51:27-0800",
         "reconciled": true,
         "note": "Preliminary. Precinct-level figures come from the county's live results map feed and cover only the contests the county chooses to map; every other big race is countywide-only until the certified Statement of Vote is published. Per-precinct registration and turnout do not exist in either live feed."
       },
       "precinct_level_contests": [
+        "Attorney General",
+        "Controller",
+        "Governor",
+        "Insurance Commissioner",
+        "Lieutenant Governor",
         "Measure RTM - Public Transit Revenue Measure District",
-        "U.S. Representative, 14th Congressional District"
+        "Member, State Board of Equalization, 2nd District",
+        "Proposition 1",
+        "Proposition 2",
+        "Proposition 3",
+        "Proposition 37",
+        "Proposition 38",
+        "Proposition 39",
+        "Proposition 4",
+        "Proposition 40",
+        "Proposition 41",
+        "Proposition 42",
+        "Proposition 43",
+        "Proposition 44",
+        "Proposition 45",
+        "Proposition 5",
+        "Secretary of State",
+        "State Superintendent of Public Instruction",
+        "Treasurer",
+        "U.S. Representative, 10th Congressional District",
+        "U.S. Representative, 12th Congressional District",
+        "U.S. Representative, 14th Congressional District",
+        "U.S. Representative, 17th Congressional District"
       ],
-      "n_county_only": 26
+      "n_county_only": 0
     },
     {
       "id": "2026-06-primary",

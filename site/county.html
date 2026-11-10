@@ -124,8 +124,8 @@
     </div>
     <div id="controls">
       <h1>Alameda County — Big Races</h1>
-      <div class="sub">Precinct-level results countywide for statewide offices, Congress and
-        state propositions. Click a precinct or a city for detail.</div>
+      <div class="sub">Precinct-level results countywide for statewide offices, Congress,
+        state propositions and region-wide measures. Click a precinct or a city for detail.</div>
       <label for="electionSel">Election</label>
       <select id="electionSel"></select>
       <label for="contestSel">Contest</label>
@@ -175,13 +175,20 @@
           received the ballot, so those shares are within-party, not citywide.</li>
       <li><b>“Stands out”</b> flags precincts whose share differs from the countywide share by
           more than 3 points <i>and</i> beyond normal sampling noise — not merely a big-looking gap.</li>
-      <li><b>An election still being counted</b> is marked <i>preliminary</i> and built from the
-          county's two live feeds instead of a certified canvass: its results map, which carries
-          per-precinct votes for the one or two contests the county chooses to map, and its
-          results portal, which carries countywide totals for every race. The
-          <b>Latest county totals</b> tab lists all of them; the map shows the ones with
-          precinct figures. Neither feed carries per-precinct registration, so turnout is off
-          for those elections. Everything is superseded by the certified Statement of Vote.</li>
+      <li><b>An election still being counted</b> is marked <i>preliminary</i> and built without a
+          certified canvass, from whichever of three sources the county has released. Best is the
+          <b>cast vote record</b> — one anonymised record per ballot, carrying the precinct and
+          every contest on it — which the Registrar provides on request and which maps every big
+          race at once. Failing that, the county's <b>results map</b> feed carries per-precinct
+          votes for just the one or two contests it chooses to map, and its <b>results portal</b>
+          carries countywide totals for every race with no geography at all. The
+          <b>Latest county totals</b> tab lists all of them; the map shows the ones with precinct
+          figures. None of these sources carries per-precinct registration, so turnout is off for
+          those elections, and all are superseded by the certified Statement of Vote.</li>
+      <li><b>Precincts with no result in a cast vote record.</b> State law (2 CCR 20126) requires a
+          published cast vote record to have the choices stripped from any ballot that could be
+          traced to an individual voter. In a small enough precinct that covers every ballot, so
+          the precinct is shown as no-data rather than as zero votes. The panel says how many.</li>
       <li><b>Region-wide district measures</b> (a measure put to the whole county by a district
           that spans it, such as the 2026 transit measure) are included. Measures from one city,
           school or park district are not — they would leave the county map mostly empty.</li>
@@ -630,11 +637,15 @@ function render(){
   if(isPrelim()){
     const st=prelimStatus(), other=countyOnly().length;
     pc.style.display="block";
+    const nMapped = Object.keys(state.catalog).length;
     pc.innerHTML = `⏳ <b>${esc(st.status||"Preliminary")}</b>`
       + (st.last_updated? ` · ${esc(st.last_updated)}`:"")
-      + `<br>Only ${Object.keys(state.catalog).length} race${Object.keys(state.catalog).length===1?"":"s"} `
-      + `${Object.keys(state.catalog).length===1?"has":"have"} precinct figures yet`
-      + (other? ` — the other ${other} are in the <b>Latest county totals</b> tab.`:".");
+      + (other
+          ? `<br>Only ${nMapped} race${nMapped===1?"":"s"} ${nMapped===1?"has":"have"} `
+            + `precinct figures yet — the other ${other} are in the `
+            + `<b>Latest county totals</b> tab.`
+          : `<br>All ${nMapped} races mapped from the county's cast vote record. `
+            + `Counting continues; figures are not final.`);
   } else pc.style.display="none";
 
   const pn=document.getElementById("partyNote");
@@ -801,9 +812,17 @@ function prelimBanner(){
   const mapped=(st.precinct_level_contests||Object.keys(state.catalog)).length;
   const other=countyOnly().length;
   const next=(st.next_updates||[])[0];
+  const fromCVR = st.precinct_source === "cast_vote_record";
+  const redacted = ((state.results.cvr||{}).redacted_precincts)||[];
+  // the largest gap between any contest's precinct sum and the portal's countywide
+  // figure — stated as the bound, so the claim is the weakest one that is true
+  const deltas = Object.values(st.reconciliation||{})
+    .map(r=>Math.abs(r&&r.delta_pct||0)).filter(v=>v>0);
+  const worst = deltas.length? Math.max(...deltas).toFixed(2)+"%" : "a fraction of a percent";
   const srcs=[];
   if(st.map_feed_url) srcs.push(`<a class="src" href="${esc(st.map_feed_url)}" target="_blank" rel="noopener">results-map feed</a>`);
   if(st.portal_url) srcs.push(`<a class="src" href="${esc(st.portal_url)}" target="_blank" rel="noopener">results portal</a>`);
+  if(fromCVR) srcs.push(`cast vote record obtained from the Registrar`);
   return `<div class="card prelim">`
     + `<div class="lbl">Count still running</div>`
     + `<b class="hdr">${esc(st.status||"Preliminary / unofficial")}</b>`
@@ -816,8 +835,25 @@ function prelimBanner(){
       + (other? `; <b>${other}</b> more ${other===1?"is":"are"} countywide-only until the certified Statement of Vote is published.`:".")
       + `</div>`
     + (next? `<div class="meta">Next county update: <b>${esc(next)}</b>.</div>`:"")
-    + `<div class="meta">Per-precinct registration and turnout are not in either live feed, so
-        the turnout map is off for this election.${st.reconciled===false? " <b>⚠ Precinct sums do not match the county's own totals</b> — treat with care." : ""}</div>`
+    + (fromCVR
+        ? `<div class="meta">Precinct figures come from the county's <b>cast vote record</b> —
+             one anonymised record per ballot — so every big race is mapped, not just the
+             one or two the county's own results map covers. Summed by precinct they land
+             within ${worst} of the county's published countywide totals, the two being
+             snapshots taken minutes apart.</div>`
+          + (redacted.length
+              ? `<div class="meta"><b>${redacted.length} precincts show no result.</b>
+                   State law (2 CCR 20126) requires a published cast vote record to have the
+                   choices removed from any ballot that could be traced to an individual
+                   voter, and in these precincts — all of them small — that applied to every
+                   ballot. They are blank here rather than zero.</div>`
+              : "")
+          + `<div class="meta">A cast vote record carries no registration, so the turnout map
+               is off and the turnout above is the county's own figure, not one derived
+               here.</div>`
+        : `<div class="meta">Per-precinct registration and turnout are not in either live feed, so
+             the turnout map is off for this election.</div>`)
+    + (st.reconciled===false? `<div class="meta"><b>⚠ Precinct sums do not match the county's own totals</b> — treat with care.</div>`:"")
     + (srcs.length? `<div class="meta">Source: ${srcs.join(" · ")}</div>`:"")
     + `</div>`;
 }
@@ -827,7 +863,7 @@ function tabStrip(){
   const t=(id,label)=>`<button data-tab="${id}" class="${state.tab===id?"active":""}">${label}</button>`;
   return `<div class="tabs">`
     + t("map","Precinct detail")
-    + t("latest",`Latest county totals${other?` (${other+Object.keys(state.catalog).length})`:""}`)
+    + t("latest",`Latest county totals (${other+Object.keys(state.catalog).length})`)
     + `</div>`;
 }
 
@@ -878,10 +914,14 @@ function latestView(meta){
     + prelimBanner()
     + body
     + `<div style="font-size:11px;color:#6b6b6b;margin-top:14px">Every figure here is a
-        <b>countywide</b> total. Races marked “mapped” are the ones the county publishes
-        precinct by precinct, so those also work in the map tab with the full set of
-        modes. The rest get precinct figures when the Statement of Vote is certified,
-        which is also when these numbers become final.</div>`;
+        <b>countywide</b> total. Races marked “mapped” have precinct figures too, so they
+        also work in the map tab with the full set of modes.`
+      + (countyOnly().length
+          ? ` The rest get precinct figures when the Statement of Vote is certified,
+              which is also when these numbers become final.`
+          : ` Counting is still running, so none of these are final — the certified
+              Statement of Vote supersedes them.`)
+      + `</div>`;
 }
 
 function buildPanel(){

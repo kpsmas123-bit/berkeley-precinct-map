@@ -95,13 +95,34 @@ build_preliminary() {
   local RAW="$ROOT/data/raw/$EID"
   local GEO="$CDIR/geo/$EID.geojson" IDS="$CDIR/ids/$EID.json" OUT="$CDIR/results/$EID.json"
 
-  echo "──────── $EID  (county, PRELIMINARY — live feeds) ────────"
+  # A Cast Vote Record export, if one has been obtained, beats the live map feed by
+  # a mile: one record per ballot, every contest, with the precinct on it. Drop it at
+  # data/raw/<eid>/cvr/export.zip (gitignored; a symlink is fine) or point CVR_EXPORT
+  # at it. Without one, the live results-map feed is used and only the one or two
+  # contests the county chooses to map get precinct figures.
+  local CVR="${CVR_EXPORT:-$RAW/cvr/export.zip}"
+  local PARSED="$CDIR/tmp/$EID.cvr.json"
+
+  echo "──────── $EID  (county, PRELIMINARY) ────────"
   bash "$ROOT/ingest/download.sh" "$EID" || { echo "  FAIL download"; return 1; }
   "$PY" "$ROOT/ingest/build_county_geo.py" \
         "$RAW/precincts.geojson" "$CDIR/cities.geojson" "$GEO" "$IDS" \
         || { echo "  FAIL county geo"; return 1; }
-  "$PY" "$ROOT/ingest/fetch_live_county.py" "$EID" "$GEO" "$OUT" --rov-id="$ROVID" \
-        || { echo "  FAIL live county results"; return 1; }
+
+  if [ -e "$CVR" ]; then
+    echo "  source: cast vote record ($CVR)"
+    "$PY" "$ROOT/ingest/parse_cvr.py" "$CVR" "$EID" "$PARSED" \
+          --precinct-ids="$IDS" --quiet \
+          || { echo "  FAIL CVR parse"; return 1; }
+    "$PY" "$ROOT/ingest/fetch_live_county.py" "$EID" "$GEO" "$OUT" \
+          --rov-id="$ROVID" --from-cvr="$PARSED" \
+          || { echo "  FAIL county results from CVR"; return 1; }
+    rm -f "$PARSED"
+  else
+    echo "  source: live results-map feed (no CVR at $CVR)"
+    "$PY" "$ROOT/ingest/fetch_live_county.py" "$EID" "$GEO" "$OUT" --rov-id="$ROVID" \
+          || { echo "  FAIL live county results"; return 1; }
+  fi
   return 0
 }
 
