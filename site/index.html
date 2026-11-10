@@ -158,6 +158,7 @@
       </div>
       <div id="rcvNote">⚑ Ranked-choice contest — this shows <b>first-choice votes only</b>.</div>
       <button class="ctrlbtn" id="resetView">⤢ Reset map view</button>
+      <button class="ctrlbtn" id="shareBtn">🔗 Copy link to this map</button>
       <!-- Authoring tool — hidden in the public build; remove display:none to score contests locally. -->
       <button class="editBtn" id="openEditor" style="display:none">✎ Edit alignment scores…</button>
     </div>
@@ -356,8 +357,14 @@ async function boot() {
   }
   map.on("load", init);
   // resilience: start as soon as the style is ready even if basemap tiles stall/are blocked
-  let _t=0; const _poll=setInterval(()=>{ if(inited || _t++>25){ clearInterval(_poll); return; }
-    if(map.isStyleLoaded()) init(); }, 400);
+  // Start as soon as the style settles. The style can take a while on a slow or
+  // throttled connection, so wait up to ~30s before giving up on it; past that,
+  // start anyway so the visitor gets the results panel rather than a blank page
+  // (loadElection's layer setup tolerates a not-yet-ready style and retries).
+  let _t=0; const _poll=setInterval(()=>{
+    if(inited){ clearInterval(_poll); return; }
+    if(map.isStyleLoaded() || _t++ > 75){ clearInterval(_poll); init(); }
+  }, 400);
 }
 function eachCoord(geom, fn){ const walk=a=>{ if(typeof a[0]==="number") fn(a); else a.forEach(walk); }; walk(geom.coordinates); }
 function fitToPrecincts(duration){
@@ -390,14 +397,17 @@ async function loadElection(id) {
   state.results = await (await fetch(`${DATA}/${meta.results}`)).json();
   state.catalog = state.results.contests;
 
-  ["precincts-fill","precincts-line","precincts-sel","districts-all","districts-focus"].forEach(l=>{ if(map.getLayer(l)) map.removeLayer(l); });
-  ["precincts","districts"].forEach(s=>{ if(map.getSource(s)) map.removeSource(s); });
-
   const geo = await (await fetch(`${DATA}/${meta.geo}`)).json();
   const dgeo = await (await fetch(`${DATA}/${meta.districts_geo}`)).json();
   state._geo = geo;   // kept for precinctCenter (avoids reading MapLibre internals)
   state.dmembers = {}; dgeo.features.forEach(f=> state.dmembers[String(f.properties.district)] = f.properties.member);
 
+  // Map layers are set up in one fault-tolerant block: if the style is not ready
+  // yet (slow/blocked basemap) addSource throws, and we retry once the style
+  // settles instead of failing the whole load — the results panel still renders.
+  const setupLayers = () => {
+  ["precincts-fill","precincts-line","precincts-sel","districts-all","districts-focus"].forEach(l=>{ if(map.getLayer(l)) map.removeLayer(l); });
+  ["precincts","districts"].forEach(s=>{ if(map.getSource(s)) map.removeSource(s); });
   map.addSource("precincts", { type:"geojson", data:geo, promoteId:"precinct" });
   map.addSource("districts", { type:"geojson", data:dgeo });
   map.addLayer({ id:"precincts-fill", type:"fill", source:"precincts",
@@ -413,8 +423,11 @@ async function loadElection(id) {
   // street/place labels on top of the fills
   if(!map.getLayer("base-labels"))
     map.addLayer({ id:"base-labels", type:"raster", source:"esriLabels", paint:{ "raster-opacity":0.9 } });
-
   fitToPrecincts(0);
+  };
+  try { setupLayers(); }
+  catch(e){ console.warn("style not ready, retrying layer setup:", e && e.message);
+            map.once("styledata", ()=>{ try{ setupLayers(); render(); }catch(_){} }); }
 
   if(!map.__precinctWired){                 // register interaction handlers ONCE, not per election switch
     map.__precinctWired = true;
@@ -898,6 +911,19 @@ function wireControls(){
   document.getElementById("electionSel").onchange=e=>{ state.contest=null; state.district=null; state.focus=null;
     loadElection(e.target.value).catch(err=>{ console.error(err); fatal("Could not load that election. Please refresh."); }); };
   document.getElementById("resetView").onclick=fitToPrecincts;
+  document.getElementById("shareBtn").onclick=async ()=>{
+    updateHash();                      // link reflects exactly what is on screen
+    const btn=document.getElementById("shareBtn"), url=location.href;
+    const done=ok=>{ btn.textContent = ok? "✓ Link copied" : "⚠ Copy failed — select the URL bar";
+      setTimeout(()=>btn.textContent="🔗 Copy link to this map", 2200); };
+    try { await navigator.clipboard.writeText(url); done(true); }
+    catch(e){
+      try { const t=document.createElement("textarea"); t.value=url;
+        t.style.position="fixed"; t.style.opacity="0"; document.body.appendChild(t);
+        t.select(); const ok=document.execCommand("copy"); document.body.removeChild(t); done(ok); }
+      catch(_){ done(false); }
+    }
+  };
   const about=document.getElementById("about");
   document.getElementById("aboutBtn").onclick=()=>about.style.display="flex";
   document.getElementById("aboutOk").onclick=()=>about.style.display="none";

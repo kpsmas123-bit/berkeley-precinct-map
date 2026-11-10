@@ -124,6 +124,7 @@
       </div>
       <div id="partyNote" style="display:none;margin-top:8px;font-size:11px;background:#fff7e6;border:1px solid #f0d9a8;color:#8a5a00;padding:6px 8px;border-radius:6px"></div>
       <button class="ctrlbtn" id="resetView">⤢ Reset map view</button>
+      <button class="ctrlbtn" id="shareBtn">🔗 Copy link to this map</button>
     </div>
     <div id="legend"></div>
   </div>
@@ -291,20 +292,35 @@ async function boot(){
     }
   }
   map.on("load", init);
-  let t=0; const poll=setInterval(()=>{ if(inited||t++>25){ clearInterval(poll); return; }
-    if(map.isStyleLoaded()) init(); }, 400);
+  // Start as soon as the style settles; if the basemap is slow, blocked or offline,
+  // start anyway after ~8s rather than leaving the visitor on a blank page.
+  let t=0; const poll=setInterval(()=>{
+    if(inited){ clearInterval(poll); return; }
+    if(map.isStyleLoaded() || t++ > 75){ clearInterval(poll); init(); }
+  }, 400);
 }
 
+/* Permalink: #<election>/<contest>/<mode>[/c-<choice>][/<city>]
+   The selected candidate MUST be in the link — the whole point of sharing a
+   "% for a choice" or "stands out" view is which candidate it is about. Trailing
+   tokens are tagged rather than positional so a link without a candidate (or
+   without a city) still parses. */
 function parseHash(){
   const parts=(location.hash||"").replace(/^#/,"").split("/").filter(Boolean);
   const eid = parts[0] && elections.find(e=>e.id===parts[0]) ? parts[0] : elections[0].id;
   state.election=eid;
   state._pendingContest = parts[1]||null;
   state.mode = MODES.includes(parts[2]) ? parts[2] : "winner";
-  state._pendingCity = parts[3]||null;
+  state._pendingChoice = null; state._pendingCity = null;
+  for(const t of parts.slice(3)){
+    if(t.startsWith("c-")) state._pendingChoice = t.slice(2);
+    else state._pendingCity = t;
+  }
 }
 function updateHash(){
   const p=[state.election, slug(state.contest||""), state.mode];
+  if((state.mode==="choice"||state.mode==="deviation") && state.choice)
+    p.push("c-"+slug(state.choice));
   if(state.city) p.push(slug(state.city));
   const h="#"+p.join("/");
   if(location.hash!==h) history.replaceState(null,"",h);
@@ -351,6 +367,10 @@ async function loadElection(id){
   state.catalog = results.contests;
   state._geo = geo;
 
+  // One fault-tolerant block: if the style is not ready yet (slow or blocked
+  // basemap) addSource throws, and we retry once it settles rather than failing
+  // the whole load — the results panel still renders either way.
+  const setupLayers = () => {
   ["precincts-fill","precincts-line","precincts-sel","cities-line","cities-focus"]
     .forEach(l=>{ if(map.getLayer(l)) map.removeLayer(l); });
   ["precincts","cities"].forEach(s=>{ if(map.getSource(s)) map.removeSource(s); });
@@ -374,8 +394,12 @@ async function loadElection(id){
   // place labels above the fills, so city names stay readable over the choropleth
   if(!map.getLayer("base-labels"))
     map.addLayer({ id:"base-labels", type:"raster", source:"esriLabels", paint:{ "raster-opacity":0.9 } });
+  };
+  try { setupLayers(); }
+  catch(e){ console.warn("style not ready, retrying layer setup:", e && e.message);
+            map.once("styledata", ()=>{ try{ setupLayers(); render(); fitToContest(0); }catch(_){} }); }
 
-  fitTo(geo.features, 0);
+  // initial fit happens after the contest is resolved, in loadElection's tail
 
   if(!map.__wired){
     map.__wired = true;
@@ -398,6 +422,11 @@ async function loadElection(id){
     state._pendingContest=null;
   }
   if(!state.contest || !(state.contest in state.catalog)) state.contest = defaultContest();
+  if(state._pendingChoice){
+    const m=(state.catalog[state.contest]?.choices||[]).find(c=>slug(c)===state._pendingChoice);
+    if(m) state.choice=m;
+    state._pendingChoice=null;
+  }
   if(state._pendingCity){
     const m=Object.keys(state.results.cities).find(c=>slug(c)===state._pendingCity);
     if(m) state.city=m;
@@ -405,7 +434,29 @@ async function loadElection(id){
   }
   document.getElementById("contestSel").value = state.contest;
   render();
+  // fit once the contest is known: a shared link to a congressional race should open
+  // on that district, not on the whole county with a small painted patch. If the link
+  // names a city, that city wins.
+  if(state.city){
+    const pids=new Set(state.results.cities[state.city]||[]);
+    fitTo(state._geo.features.filter(f=>pids.has(f.properties.precinct)), 0);
+  } else fitToContest(0);
 }
+
+/** Features for precincts that actually have the selected contest. A congressional
+    or legislative race covers only part of the county, so fitting the whole county
+    leaves the painted area a small blob — a shared link should open on the district
+    the contest is about. */
+function contestFeatures(){
+  if(!state._geo) return [];
+  const P=state.results.precincts;
+  const f=state._geo.features.filter(x=>{
+    const p=P[x.properties.precinct];
+    return p && p.contests && (state.contest in p.contests);
+  });
+  return f.length? f : state._geo.features;
+}
+function fitToContest(duration){ fitTo(contestFeatures(), duration); }
 
 function defaultContest(){
   const names=Object.keys(state.catalog);
@@ -743,7 +794,7 @@ function wirePanel(){
     fitTo(feats);
   });
   const back=document.getElementById("backBtn");
-  if(back) back.onclick=()=>{ state.city=null; state.focus=null; render(); fitTo(state._geo.features); };
+  if(back) back.onclick=()=>{ state.city=null; state.focus=null; render(); fitToContest(); };
   document.querySelectorAll(".prec .ph").forEach(b=> b.onclick=()=>{
     state.focus=b.dataset.pid; render();
     const f=state._geo.features.find(x=>x.properties.precinct===state.focus);
@@ -761,7 +812,7 @@ function wireControls(){
     await loadElection(e.target.value);
   };
   document.getElementById("contestSel").onchange = e=>{
-    state.contest=e.target.value; state.choice=null; render();
+    state.contest=e.target.value; state.choice=null; render(); fitToContest();
   };
   document.querySelectorAll('.modes button[data-mode]').forEach(b=> b.onclick=()=>{
     if(b.disabled) return;
@@ -769,7 +820,21 @@ function wireControls(){
   });
   document.getElementById("choiceSel").onchange = e=>{ state.choice=e.target.value; render(); };
   document.getElementById("resetView").onclick = ()=>{
-    state.city=null; state.focus=null; render(); fitTo(state._geo.features);
+    state.city=null; state.focus=null; render(); fitToContest();
+  };
+  document.getElementById("shareBtn").onclick = async ()=>{
+    updateHash();                       // make sure the link reflects what is on screen
+    const btn=document.getElementById("shareBtn"), url=location.href;
+    const done=ok=>{ btn.textContent = ok? "✓ Link copied" : "⚠ Copy failed — select the URL bar";
+      setTimeout(()=>btn.textContent="🔗 Copy link to this map", 2200); };
+    try { await navigator.clipboard.writeText(url); done(true); }
+    catch(e){
+      // clipboard API needs a secure context; fall back to a selectable textarea
+      try { const t=document.createElement("textarea"); t.value=url;
+        t.style.position="fixed"; t.style.opacity="0"; document.body.appendChild(t);
+        t.select(); const ok=document.execCommand("copy"); document.body.removeChild(t); done(ok); }
+      catch(_){ done(false); }
+    }
   };
   document.getElementById("aboutBtn").onclick = ()=> document.getElementById("about").style.display="flex";
   document.getElementById("aboutOk").onclick  = ()=> document.getElementById("about").style.display="none";
