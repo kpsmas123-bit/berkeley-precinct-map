@@ -747,7 +747,11 @@ function buildLegend(){
       + gradBar(["0%","","50%","","100%"]) + noDataRow;
   } else {
     const cmap=colorMap();
-    const shown = c.kind==="measure" ? (c.choices||[]) : topChoices(7).concat([OTHER]);
+    // "Other candidates" is a real swatch only when some choice is actually lumped
+    // into it — a two-way race should not advertise an empty overflow bucket.
+    const lead = topChoices(7);
+    const shown = c.kind==="measure" ? (c.choices||[])
+      : lead.concat((c.choices||[]).length > lead.length ? [OTHER] : []);
     el.innerHTML = `<div style="font-weight:600;margin-bottom:4px">Leading choice</div>`
       + shown.map(ch=>`<div class="row"><span class="sw" style="background:${cmap[ch]||"#bbb"}"></span>${esc(ch)}</div>`).join("")
       + noDataRow;
