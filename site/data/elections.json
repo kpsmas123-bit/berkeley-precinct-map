@@ -1,6 +1,59 @@
 {
   "elections": [
     {
+      "id": "2026-11-general",
+      "date": "2026-11-03",
+      "name": "November 3, 2026 General Election",
+      "results": "results/2026-11-general.json",
+      "geo": "geo/2026-11-general.geojson",
+      "districts_geo": "geo/2026-11-general.districts.geojson",
+      "district_map": "berkeley-council-2021",
+      "format": "xlsx",
+      "precinct_results": false,
+      "rov_election_id": "260",
+      "citywide": "live/2026-11-general.citywide.json",
+      "sources": {
+        "precincts_geojson": "https://opendata.arcgis.com/api/v3/datasets/a0a6b435f9a049d488854669d2376038/downloads/data?format=geojson&spatialRefId=4326",
+        "live_results": "https://alamedacountyca.gov/rovresults/260/",
+        "election_page": "https://acvote.alamedacountyca.gov/election-information/elections?id=260"
+      },
+      "notes": "Precinct canvass not yet published \u2014 the county releases the Statement of Vote at/near certification (~30 days). Citywide totals only, scraped from the live portal; choropleth disabled until the SOV lands. To finish: add sov + district_canvass_xlsx sources, remove precinct_results, re-run ./build.sh 2026-11-general."
+    },
+    {
+      "id": "2026-06-primary",
+      "date": "2026-06-02",
+      "name": "June 2, 2026 Direct Primary Election",
+      "results": "results/2026-06-primary.json",
+      "geo": "geo/2026-06-primary.geojson",
+      "districts_geo": "geo/2026-06-primary.districts.geojson",
+      "district_map": "berkeley-council-2021",
+      "format": "xlsx",
+      "sources": {
+        "sov": "https://acvote.alamedacountyca.gov/acvote-assets/02_election_information/PDFs/20260602/Results/PrecinctCanvassJun02.xlsx",
+        "district_canvass_xlsx": "https://acvote.alamedacountyca.gov/acvote-assets/02_election_information/PDFs/20260602/Results/DistrictCanvassJun02.xlsx",
+        "precincts_geojson": "https://opendata.arcgis.com/api/v3/datasets/d1eaf0834a8e4300bb3a7ca3466494ff/downloads/data?format=geojson&spatialRefId=4326",
+        "election_page": "https://acvote.alamedacountyca.gov/election-information/elections?id=259"
+      },
+      "notes": "Statewide direct primary (Governor et al.) plus county contests. County switched the canvass to a PDFs/<date>/Results/ path with new filenames; workbook layout is the standard SOV."
+    },
+    {
+      "id": "2025-11-special",
+      "date": "2025-11-04",
+      "name": "November 4, 2025 Statewide Special Election",
+      "results": "results/2025-11-special.json",
+      "geo": "geo/2025-11-special.geojson",
+      "districts_geo": "geo/2025-11-special.districts.geojson",
+      "district_map": "berkeley-council-2021",
+      "format": "xlsx",
+      "sources": {
+        "sov": "https://acvote.alamedacountyca.gov/acvote-assets/02_election_information/SOV/20251104/Statement%20of%20Vote%20-%20Statewide%20Special%20Election.xlsx",
+        "district_canvass_xlsx": "https://acvote.alamedacountyca.gov/acvote-assets/02_election_information/SOV/20251104/District%20Canvass%20-%20Statewide%20Special%20Election.xlsx",
+        "precincts_geojson": "https://opendata.arcgis.com/api/v3/datasets/5a0fa695ceb042c482d21ff7558628ff/downloads/data?format=geojson&spatialRefId=4326",
+        "election_page": "https://acvote.alamedacountyca.gov/election-information/elections?id=258"
+      },
+      "notes": "Single-contest special: Proposition 50 (congressional redistricting). One statewide measure only \u2014 no local Berkeley contests on the ballot."
+    },
+    {
       "id": "2024-11-general",
       "date": "2024-11-05",
       "name": "November 5, 2024 General Election",
@@ -145,7 +198,7 @@
         "precincts_geojson": "https://opendata.arcgis.com/api/v3/datasets/11df17fd01fb4f88a3fde8262b895ecc/downloads/data?format=geojson&spatialRefId=4326",
         "election_page": "https://acvote.alamedacountyca.gov/election-information/elections"
       },
-      "notes": "Legacy .xls SOV; no District Canvass published (not reconciled). Berkeley Mayor (Arreguín) + council D2/3/5/6 are RCV, first-choice only."
+      "notes": "Legacy .xls SOV; no District Canvass published (not reconciled). Berkeley Mayor (Arregu\u00edn) + council D2/3/5/6 are RCV, first-choice only."
     },
     {
       "id": "2016-06-primary",

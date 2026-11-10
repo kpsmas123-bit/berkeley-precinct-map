@@ -10,4 +10,19 @@ cp "$ROOT/data/processed/geo/"*.geojson  "$ROOT/site/data/geo/"
 for f in measures.json alignment.json featured.json; do
   [ -f "$ROOT/data/processed/$f" ] && cp "$ROOT/data/processed/$f" "$ROOT/site/data/$f"
 done
+
+# countywide map data (built separately by ./build_county.sh)
+if [ -d "$ROOT/data/processed/county" ]; then
+  mkdir -p "$ROOT/site/data/county/results" "$ROOT/site/data/county/geo"
+  for f in elections.json cities.geojson; do
+    [ -f "$ROOT/data/processed/county/$f" ] && cp "$ROOT/data/processed/county/$f" "$ROOT/site/data/county/$f"
+  done
+  if compgen -G "$ROOT/data/processed/county/results/*.json" > /dev/null; then
+    cp "$ROOT/data/processed/county/results/"*.json "$ROOT/site/data/county/results/"
+  fi
+  if compgen -G "$ROOT/data/processed/county/geo/*.geojson" > /dev/null; then
+    cp "$ROOT/data/processed/county/geo/"*.geojson "$ROOT/site/data/county/geo/"
+  fi
+  echo "staged county data   -> site/data/county/"
+fi
 echo "staged processed data -> site/data/"

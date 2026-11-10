@@ -22,7 +22,8 @@ import sys
 
 import openpyxl
 
-from parse_canvass import clean_contest_name, display_name, as_int, NUM_PREFIX
+from parse_canvass import (clean_contest_name, display_name, as_int, NUM_PREFIX,
+                           AGGREGATE_COLS)
 
 THRESHOLD = 0.005
 JURIS = "city of berkeley"
@@ -51,7 +52,8 @@ def parse_district_canvass(path):
                        if ci >= 5 and h and str(h).strip()
                        and str(h).strip().lower() not in
                        ("registered voters", "voters cast", "turnout (%)",
-                        "over votes", "under votes")}
+                        "over votes", "under votes")
+                       and str(h).strip().lower() not in AGGREGATE_COLS}
         name = display_name(title)
         bucket = out.setdefault(name, {})
         for row in rows[header_idx + 1:]:

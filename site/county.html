@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Alameda County Precinct Map — Big Races</title>
+<link href="./vendor/maplibre-gl.css" rel="stylesheet" />
+<script src="./vendor/maplibre-gl.js"></script>
+<style>
+  :root { --panel: 372px; --bg:#f7f7f5; --ink:#1a1a1a; --muted:#6b6b6b; --line:#e2e2dd;
+          --gold:#e8a400; --below:#b35806; --above:#2166ac; --neutral:#e8e8e6; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--ink); }
+  #app { display:grid; grid-template-columns:1fr var(--panel); height:100%; }
+  #map { position:relative; }
+  #panel { border-left:1px solid var(--line); background:#fff; overflow-y:auto; padding:16px 18px 48px; }
+  #controls { position:absolute; top:12px; left:12px; z-index:5; background:rgba(255,255,255,.96);
+    border:1px solid var(--line); border-radius:10px; padding:12px 14px; width:342px; box-shadow:0 2px 10px rgba(0,0,0,.08); }
+  #controls h1 { font-size:14px; margin:0 0 2px; letter-spacing:.2px; }
+  #controls .sub { font-size:11px; color:var(--muted); margin-bottom:10px; }
+  label { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin:8px 0 3px; }
+  select { width:100%; padding:6px 8px; font-size:13px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  .modes { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; }
+  .modes button { flex:1 1 30%; font-size:12px; padding:6px 4px; border:1px solid var(--line); background:#fff; border-radius:6px; cursor:pointer; }
+  .modes button.active { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .modes button:disabled { opacity:.4; cursor:not-allowed; }
+  .ctrlbtn { width:100%; margin-top:6px; padding:6px; font-size:12px; border:1px solid var(--line); background:#fff; border-radius:6px; cursor:pointer; }
+  #legend { position:absolute; bottom:14px; left:12px; z-index:5; background:rgba(255,255,255,.96);
+    border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:12px; max-width:320px; box-shadow:0 2px 10px rgba(0,0,0,.08); }
+  #legend .row { display:flex; align-items:center; gap:6px; margin:2px 0; }
+  #legend .sw { width:14px; height:14px; border-radius:3px; border:1px solid rgba(0,0,0,.15); flex:none; }
+  #nav { position:absolute; top:12px; right:12px; z-index:5; display:flex; gap:6px; }
+  #nav a, #nav button { font-size:12px; padding:6px 10px; border:1px solid var(--line); border-radius:8px;
+    background:rgba(255,255,255,.96); color:var(--ink); text-decoration:none; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.1); }
+  .dhead { display:flex; align-items:baseline; justify-content:space-between; gap:8px; border-bottom:2px solid var(--ink); padding-bottom:6px; margin-bottom:2px; }
+  .dhead h2 { font-size:17px; margin:0; }
+  .dhead .mem { font-size:12px; color:var(--muted); white-space:nowrap; }
+  .vintage { font-size:11px; color:var(--muted); margin:4px 0 14px; }
+  .contestTitle { font-size:14px; margin:4px 0 2px; }
+  .subtotal { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin:8px 0 16px; }
+  .subtotal .lbl, .card .lbl { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin-bottom:4px; }
+  .card { border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin:8px 0 16px; }
+  .card.measure { background:#f3f7fb; border-color:#cfe0ee; }
+  .card.note { background:#fff7e6; border-color:#f0d9a8; color:#8a5a00; font-size:12px; }
+  table.res { width:100%; border-collapse:collapse; font-size:13px; margin-top:4px; }
+  table.res td { padding:3px 2px; border-bottom:1px solid var(--line); }
+  table.res td.v { text-align:right; font-variant-numeric:tabular-nums; }
+  table.res td.p { text-align:right; color:var(--muted); width:48px; font-variant-numeric:tabular-nums; }
+  table.res tr.win td { font-weight:700; }
+  .bar { height:4px; background:#d9d9d3; border-radius:2px; margin-top:3px; }
+  .bar > span { display:block; height:100%; border-radius:2px; }
+  .cityrow { display:block; width:100%; text-align:left; font:inherit; color:inherit; background:none;
+    border:none; border-bottom:1px solid var(--line); padding:8px 2px; cursor:pointer; }
+  .cityrow:hover .cn { text-decoration:underline; }
+  .cityrow:focus-visible { outline:2px solid var(--above); outline-offset:2px; }
+  .cityrow .top { display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+  .cityrow .cn { font-weight:600; font-size:13px; }
+  .cityrow .mv { font-size:12px; font-variant-numeric:tabular-nums; color:#333; }
+  .cityrow .sub2 { font-size:11px; color:var(--muted); margin-top:1px; }
+  .prec { margin:0 0 14px; }
+  .prec .ph { width:100%; text-align:left; font:inherit; color:inherit; background:none; border:none;
+    border-radius:6px; display:flex; align-items:baseline; justify-content:space-between; cursor:pointer; }
+  .prec .ph:hover .pid { text-decoration:underline; }
+  .prec .pid { font-weight:600; font-size:13px; }
+  .prec .turn { font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .prec.focus .pid { color:#111; }
+  .back { font-size:12px; color:#2a6; cursor:pointer; text-decoration:underline; background:none; border:none; padding:0; margin-bottom:8px; }
+  .dvrow { margin:8px 0; }
+  .dvrow .top { display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px; }
+  .dvrow .dev { font-weight:700; font-variant-numeric:tabular-nums; }
+  .dvbar { position:relative; height:10px; background:#ececea; border-radius:3px; }
+  .dvbar .z { position:absolute; left:50%; top:-2px; bottom:-2px; width:1px; background:#9a9a94; }
+  .dvbar .seg { position:absolute; top:0; bottom:0; border-radius:3px; }
+  .credit { font-size:11px; color:var(--muted); margin-top:24px; line-height:1.5; }
+  a.src { color:#2a6; }
+  #about { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:30; display:none; align-items:center; justify-content:center; padding:16px; }
+  #about .box { background:#fff; border-radius:12px; padding:22px 24px; max-width:540px; max-height:86vh; overflow-y:auto; box-shadow:0 12px 44px rgba(0,0,0,.3); }
+  #about h2 { margin:0 0 6px; font-size:18px; }
+  #about p { font-size:13.5px; line-height:1.55; margin:8px 0; color:#333; }
+  #about ul { font-size:13px; line-height:1.5; color:#444; padding-left:18px; margin:8px 0; }
+  #about .ok { margin-top:14px; padding:9px 16px; border-radius:8px; border:none; background:var(--ink); color:#fff; font-size:14px; cursor:pointer; }
+  @media (max-width:760px){
+    #app { grid-template-columns:1fr; grid-template-rows:56vh auto; }
+    #panel { border-left:none; border-top:1px solid var(--line); }
+    #controls { left:8px; right:8px; width:auto; max-height:42vh; overflow-y:auto; }
+    #legend { max-width:52%; bottom:8px; }
+    #nav { top:auto; bottom:8px; right:8px; }
+    .modes button, select, .ctrlbtn { min-height:40px; }
+    .prec .ph, .cityrow { min-height:40px; }
+  }
+</style>
+</head>
+<body>
+<noscript><div style="padding:24px;font:15px/1.6 -apple-system,Arial,sans-serif;max-width:640px">
+  <h2>Alameda County Precinct Map</h2>
+  <p>This interactive map needs JavaScript and a WebGL-capable browser. The underlying
+  results are plain JSON under <code>/data/county/</code> in the source repository.</p>
+</div></noscript>
+<div id="app">
+  <div id="map">
+    <div id="nav">
+      <a href="./index.html" title="Berkeley local races">Berkeley map</a>
+      <button id="aboutBtn" title="About this map" aria-label="About this map">ⓘ</button>
+    </div>
+    <div id="controls">
+      <h1>Alameda County — Big Races</h1>
+      <div class="sub">Precinct-level results countywide for statewide offices, Congress and
+        state propositions. Click a precinct or a city for detail.</div>
+      <label for="electionSel">Election</label>
+      <select id="electionSel"></select>
+      <label for="contestSel">Contest</label>
+      <select id="contestSel"></select>
+      <label>Map mode</label>
+      <div class="modes">
+        <button data-mode="winner" class="active">Winner</button>
+        <button data-mode="margin">Margin</button>
+        <button data-mode="turnout" id="turnoutBtn">Turnout</button>
+        <button data-mode="choice">% for a choice</button>
+        <button data-mode="deviation" title="Where a precinct voted clearly differently from the county">Stands out</button>
+      </div>
+      <div id="choiceWrap" style="display:none">
+        <label for="choiceSel">Candidate / choice</label>
+        <select id="choiceSel"></select>
+      </div>
+      <div id="partyNote" style="display:none;margin-top:8px;font-size:11px;background:#fff7e6;border:1px solid #f0d9a8;color:#8a5a00;padding:6px 8px;border-radius:6px"></div>
+      <button class="ctrlbtn" id="resetView">⤢ Reset map view</button>
+      <button class="ctrlbtn" id="shareBtn">🔗 Copy link to this map</button>
+    </div>
+    <div id="legend"></div>
+  </div>
+  <div id="panel"><div style="color:#6b6b6b;font-size:13px">Loading…</div></div>
+</div>
+
+<div id="about" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+  <div class="box">
+    <h2 id="aboutTitle">About this map</h2>
+    <p>Precinct-level results for <b>every precinct in Alameda County</b>, limited to the
+       contests that appear on essentially every ballot: statewide constitutional offices,
+       U.S. President / Senate / House, state propositions, and the 2021 gubernatorial recall.</p>
+    <p><b>Local races are deliberately left out.</b> A city council or school board race shown
+       countywide is a mostly-empty map. Berkeley's local contests live on the
+       <a href="./index.html">Berkeley precinct map</a>.</p>
+    <ul>
+      <li><b>Precinct IDs are not stable between elections</b> — each election uses the geometry
+          the county published for it. Results are never joined across elections.</li>
+      <li><b>Jurisdiction labels</b> come from the city contests a precinct actually votes in,
+          falling back to the county's city outlines. That matters on city borders, where a
+          precinct's polygon can sit inside a neighbouring city while its voters are on the
+          other city's ballot.</li>
+      <li><b>Shares</b> are votes for a choice over all votes cast in that contest in that
+          precinct (not over ballots cast).</li>
+      <li><b>Party presidential primaries</b> are shown per party. Only that party's voters
+          received the ballot, so those shares are within-party, not citywide.</li>
+      <li><b>“Stands out”</b> flags precincts whose share differs from the countywide share by
+          more than 3 points <i>and</i> beyond normal sampling noise — not merely a big-looking gap.</li>
+    </ul>
+    <p style="font-size:12px;color:#6b6b6b">Tallies: Alameda County Registrar of Voters
+       (Statement of Vote). Geometry: Alameda County Open Data Hub. Basemap © OpenStreetMap / CARTO.</p>
+    <button class="ok" id="aboutOk">Got it</button>
+  </div>
+</div>
+
+<script>
+const DATA = "./data/county";
+// Okabe–Ito colourblind-safe qualitative palette, then neutral greys for overflow.
+const CAT = ["#0072B2","#E69F00","#009E73","#CC79A7","#56B4E9","#D55E00","#F0E442","#8c8c8c","#7d5aa6","#4d4d4d"];
+const YESNO = { "YES":"#2b8cbe", "NO":"#e08214" };
+const RAMP = ["#f7fbff","#c6dbef","#6baed6","#2171b5","#08306b"];
+const NEUTRAL = "#e8e8e6", NODATA = "#eee";
+const MODES = ["winner","margin","turnout","choice","deviation"];
+const DEV_MAX = 0.15;      // ±15 pts saturates the diverging scale
+const MATERIAL = 0.03;     // 3-point materiality gate
+const OTHER = "Other candidates";
+
+const state = { election:null, contest:null, mode:"winner", choice:null,
+                city:null, focus:null, results:null, catalog:null, manifest:null, _geo:null };
+let map, elections, citiesGeo;
+
+const slug = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+const esc  = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const sumv = ch => Object.values(ch||{}).reduce((a,b)=>a+b,0);
+const pct  = (n,d) => d? (100*n/d) : 0;
+const fmt  = n => (n==null?"—":n.toLocaleString());
+const fpct = (n,dp=1) => (n==null? "—" : n.toFixed(dp)+"%");
+
+function webglOK(){ try { const c=document.createElement("canvas");
+  return !!(window.WebGLRenderingContext && (c.getContext("webgl")||c.getContext("experimental-webgl"))); }
+  catch(e){ return false; } }
+function fatal(msg){ document.getElementById("panel").innerHTML =
+  `<div style="font-size:13.5px;line-height:1.6"><b>${esc(msg)}</b></div>`; }
+
+/* ---------- colour helpers ---------- */
+function rampColor(t){ t=Math.max(0,Math.min(1,t||0)); const i=t*(RAMP.length-1);
+  return mix(RAMP[Math.floor(i)], RAMP[Math.ceil(i)], i-Math.floor(i)); }
+function divColor(t){ t=Math.max(-1,Math.min(1,t||0));
+  return t>=0 ? mix(NEUTRAL,"#08306b",t) : mix(NEUTRAL,"#7f3b08",-t); }
+function mix(a,b,t){ const pa=hex(a), pb=hex(b);
+  return "#"+[0,1,2].map(i=>Math.round(pa[i]+(pb[i]-pa[i])*t).toString(16).padStart(2,"0")).join(""); }
+function hex(h){ h=h.replace("#",""); return [0,2,4].map(i=>parseInt(h.substr(i,2),16)); }
+
+/* ---------- contest helpers ---------- */
+const cat = () => state.catalog[state.contest] || {choices:[]};
+const countyTotal = n => (state.results.county_totals||{})[n] || {choices:{},cast:0};
+const cityTotal = (n,c) => ((state.results.city_totals||{})[n]||{})[c] || null;
+
+/** Top choices countywide, capped so a 20-candidate primary stays readable. */
+function topChoices(limit){
+  const t = countyTotal(state.contest).choices || {};
+  const ranked = Object.entries(t).sort((a,b)=>b[1]-a[1]).map(e=>e[0]);
+  const all = (cat().choices||[]).filter(c=>ranked.includes(c)).length ? ranked : (cat().choices||[]);
+  return limit ? all.slice(0,limit) : all;
+}
+function colorMap(){
+  const c = cat(), m = {};
+  if(c.kind==="measure"){
+    (c.choices||[]).forEach(ch=>{ const k=ch.toUpperCase().replace(/^BONDS\s+/,"");
+      m[ch] = YESNO[k] || (k.startsWith("Y")?YESNO.YES : k.startsWith("N")?YESNO.NO : CAT[0]); });
+    return m;
+  }
+  const top = topChoices(7);
+  top.forEach((ch,i)=> m[ch]=CAT[i]);
+  m[OTHER] = "#9a9a94";
+  return m;
+}
+/** Winner of a precinct entry, lumping anything outside the top-7 into OTHER. */
+function winnerOf(choices, lumpSet){
+  let best=null, bv=-1;
+  for(const [k,v] of Object.entries(choices||{})) if(v>bv){ bv=v; best=k; }
+  if(best==null) return [null,0];
+  return [ (lumpSet && !lumpSet.has(best)) ? OTHER : best, bv ];
+}
+function marginOf(choices){
+  const v = Object.values(choices||{}).sort((a,b)=>b-a);
+  const d = sumv(choices);
+  if(!d || v.length<1) return null;
+  return (v[0]-(v[1]||0))/d;
+}
+function choiceValid(){ return state.choice && (cat().choices||[]).includes(state.choice); }
+function leadingChoice(){ const t=topChoices(); return t[0] || (cat().choices||[])[0] || null; }
+function hasTurnout(){ const P=state.results.precincts;
+  return Object.values(P).some(p=>p.registered>0); }
+const overReg = p => p.registered && p.ballots_cast > p.registered;
+const isParty = n => /^[A-Z]{2,4}\s*-\s*/.test(n);
+
+/* ---------- boot ---------- */
+async function boot(){
+  if(!webglOK()){ fatal("This map needs a WebGL-capable browser to display."); return; }
+  try {
+    state.manifest = await (await fetch(`${DATA}/elections.json`)).json();
+    elections = state.manifest.elections || [];
+  } catch(e){ fatal("Could not load county election data. Please refresh."); return; }
+  if(!elections.length){ fatal("No county elections have been built yet. Run ./build_county.sh"); return; }
+  try { citiesGeo = await (await fetch(`${DATA}/${state.manifest.cities_geo}`)).json(); }
+  catch(e){ citiesGeo = null; }
+
+  const esel = document.getElementById("electionSel");
+  elections.forEach(e=> esel.add(new Option(e.name, e.id)));
+
+  map = new maplibregl.Map({
+    container:"map",
+    style:{ version:8,
+      // Esri's light-gray canvas: keyless, and a neutral ground for a choropleth.
+      // (CARTO's basemaps.cartocdn.com tiles now require an API key and serve a
+      // watermarked placeholder without one.)
+      sources:{
+        esri:{ type:"raster", tileSize:256,
+          tiles:["https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"],
+          attribution:"Esri, HERE, Garmin, © OpenStreetMap contributors" },
+        esriLabels:{ type:"raster", tileSize:256,
+          tiles:["https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}"] } },
+      layers:[{ id:"base", type:"raster", source:"esri" }] },
+    center:[-121.95,37.66], zoom:9.2 });
+  window._map = map;
+  map.on("error", e=>console.error("MAP ERROR:", e && e.error && e.error.message));
+  map.addControl(new maplibregl.NavigationControl({showCompass:false}), "bottom-right");
+
+  let inited=false;
+  async function init(){
+    if(inited) return; inited=true;
+    try {
+      parseHash();
+      document.getElementById("electionSel").value = state.election;
+      await loadElection(state.election);
+      wireControls();
+      window._ready = true;
+      try { if(!localStorage.getItem("acpm_about_v1")){
+        document.getElementById("about").style.display="flex";
+        localStorage.setItem("acpm_about_v1","1"); } } catch(e){}
+    } catch(err){
+      console.error("LOAD FAILED:", err && err.stack || err);
+      fatal("Something went wrong loading the map. Please refresh.");
+    }
+  }
+  map.on("load", init);
+  // Start as soon as the style settles; if the basemap is slow, blocked or offline,
+  // start anyway after ~8s rather than leaving the visitor on a blank page.
+  let t=0; const poll=setInterval(()=>{
+    if(inited){ clearInterval(poll); return; }
+    if(map.isStyleLoaded() || t++ > 75){ clearInterval(poll); init(); }
+  }, 400);
+}
+
+/* Permalink: #<election>/<contest>/<mode>[/c-<choice>][/<city>]
+   The selected candidate MUST be in the link — the whole point of sharing a
+   "% for a choice" or "stands out" view is which candidate it is about. Trailing
+   tokens are tagged rather than positional so a link without a candidate (or
+   without a city) still parses. */
+function parseHash(){
+  const parts=(location.hash||"").replace(/^#/,"").split("/").filter(Boolean);
+  const eid = parts[0] && elections.find(e=>e.id===parts[0]) ? parts[0] : elections[0].id;
+  state.election=eid;
+  state._pendingContest = parts[1]||null;
+  state.mode = MODES.includes(parts[2]) ? parts[2] : "winner";
+  state._pendingChoice = null; state._pendingCity = null;
+  for(const t of parts.slice(3)){
+    if(t.startsWith("c-")) state._pendingChoice = t.slice(2);
+    else state._pendingCity = t;
+  }
+}
+function updateHash(){
+  const p=[state.election, slug(state.contest||""), state.mode];
+  if((state.mode==="choice"||state.mode==="deviation") && state.choice)
+    p.push("c-"+slug(state.choice));
+  if(state.city) p.push(slug(state.city));
+  const h="#"+p.join("/");
+  if(location.hash!==h) history.replaceState(null,"",h);
+}
+
+function eachCoord(geom,fn){ const walk=a=>{ if(typeof a[0]==="number") fn(a); else a.forEach(walk); }; walk(geom.coordinates); }
+function fitTo(features, duration){
+  if(!features || !features.length) return;
+  const b=new maplibregl.LngLatBounds();
+  features.forEach(f=>eachCoord(f.geometry,c=>b.extend(c)));
+  if(b.isEmpty()) return;
+  const narrow=window.innerWidth<=760;
+  const want = narrow? {top:96,left:20,right:20,bottom:40} : {top:110,left:372,right:40,bottom:60};
+  const doFit=()=>{
+    // Clamp padding to the canvas: the county fills a far wider bbox than one city,
+    // and on a narrow desktop window the 372px control-panel inset can exceed the
+    // map pane, which makes fitBounds give up ("cannot fit within canvas") and leave
+    // the view parked on the whole Bay Area.
+    const c=map.getCanvas();
+    const W=c.clientWidth||c.width, H=c.clientHeight||c.height;
+    const fit=(a,b2,limit)=>{
+      a=Math.min(a, limit*0.35); b2=Math.min(b2, limit*0.35);   // no side eats the pane
+      const t=a+b2, max=limit*0.7;
+      return t<=max? [a,b2] : [a*max/t, b2*max/t]; };
+    const [l,r]=fit(want.left,want.right,W), [t,bm]=fit(want.top,want.bottom,H);
+    const pad={top:Math.round(t),bottom:Math.round(bm),left:Math.round(l),right:Math.round(r)};
+    try{ map.fitBounds(b,{padding:pad,duration:duration==null?400:duration}); }
+    catch(e){ try{ map.fitBounds(b,{duration:0}); }catch(_){} }
+  };
+  const c=map.getCanvas(); if(c && c.width>0 && c.height>0) doFit(); else map.once("idle",doFit);
+}
+
+/* ---------- load one election ---------- */
+async function loadElection(id){
+  state.election = id;
+  const meta = elections.find(e=>e.id===id);
+  document.getElementById("panel").innerHTML = `<div style="color:#6b6b6b;font-size:13px">Loading ${esc(meta.name)}…</div>`;
+
+  const [results, geo] = await Promise.all([
+    (await fetch(`${DATA}/${meta.results}`)).json(),
+    (await fetch(`${DATA}/${meta.geo}`)).json()
+  ]);
+  state.results = results;
+  state.catalog = results.contests;
+  state._geo = geo;
+
+  // One fault-tolerant block: if the style is not ready yet (slow or blocked
+  // basemap) addSource throws, and we retry once it settles rather than failing
+  // the whole load — the results panel still renders either way.
+  const setupLayers = () => {
+  ["precincts-fill","precincts-line","precincts-sel","cities-line","cities-focus"]
+    .forEach(l=>{ if(map.getLayer(l)) map.removeLayer(l); });
+  ["precincts","cities"].forEach(s=>{ if(map.getSource(s)) map.removeSource(s); });
+
+  map.addSource("precincts", { type:"geojson", data:geo, promoteId:"precinct" });
+  map.addLayer({ id:"precincts-fill", type:"fill", source:"precincts",
+    paint:{ "fill-color":["coalesce",["feature-state","color"],"#ddd"], "fill-opacity":0.88 } });
+  map.addLayer({ id:"precincts-line", type:"line", source:"precincts",
+    paint:{ "line-color":"#fff", "line-width":0.35, "line-opacity":0.8 } });
+  map.addLayer({ id:"precincts-sel", type:"line", source:"precincts", paint:{
+    "line-color":["case",["==",["feature-state","sel"],2],"#111",["==",["feature-state","sel"],1],"#e8a400","rgba(0,0,0,0)"],
+    "line-width":["case",["==",["feature-state","sel"],2],2.6,["==",["feature-state","sel"],1],1.2,0] } });
+  if(citiesGeo){
+    map.addSource("cities", { type:"geojson", data:citiesGeo });
+    map.addLayer({ id:"cities-line", type:"line", source:"cities",
+      paint:{ "line-color":"#555", "line-width":0.9, "line-opacity":0.55 } });
+    map.addLayer({ id:"cities-focus", type:"line", source:"cities",
+      filter:["==",["get","city"], state.city||"__none__"],
+      paint:{ "line-color":"#111", "line-width":2.4 } });
+  }
+  // place labels above the fills, so city names stay readable over the choropleth
+  if(!map.getLayer("base-labels"))
+    map.addLayer({ id:"base-labels", type:"raster", source:"esriLabels", paint:{ "raster-opacity":0.9 } });
+  };
+  try { setupLayers(); }
+  catch(e){ console.warn("style not ready, retrying layer setup:", e && e.message);
+            map.once("styledata", ()=>{ try{ setupLayers(); render(); fitToContest(0); }catch(_){} }); }
+
+  // initial fit happens after the contest is resolved, in loadElection's tail
+
+  if(!map.__wired){
+    map.__wired = true;
+    map.on("click","precincts-fill", e=>{
+      const pid=e.features[0].properties.precinct;
+      const p=state.results.precincts[pid];
+      if(!p) return;
+      state.city = p.city; state.focus = pid; render();
+      const el=document.getElementById("prec-"+pid);
+      if(el) el.scrollIntoView({block:"center", behavior:"smooth"});
+    });
+    map.on("mouseenter","precincts-fill",()=>map.getCanvas().style.cursor="pointer");
+    map.on("mouseleave","precincts-fill",()=>map.getCanvas().style.cursor="");
+  }
+
+  buildContestPicker();
+  if(state._pendingContest){
+    const m=Object.keys(state.catalog).find(n=>slug(n)===state._pendingContest);
+    if(m) state.contest=m;
+    state._pendingContest=null;
+  }
+  if(!state.contest || !(state.contest in state.catalog)) state.contest = defaultContest();
+  if(state._pendingChoice){
+    const m=(state.catalog[state.contest]?.choices||[]).find(c=>slug(c)===state._pendingChoice);
+    if(m) state.choice=m;
+    state._pendingChoice=null;
+  }
+  if(state._pendingCity){
+    const m=Object.keys(state.results.cities).find(c=>slug(c)===state._pendingCity);
+    if(m) state.city=m;
+    state._pendingCity=null;
+  }
+  document.getElementById("contestSel").value = state.contest;
+  render();
+  // fit once the contest is known: a shared link to a congressional race should open
+  // on that district, not on the whole county with a small painted patch. If the link
+  // names a city, that city wins.
+  if(state.city){
+    const pids=new Set(state.results.cities[state.city]||[]);
+    fitTo(state._geo.features.filter(f=>pids.has(f.properties.precinct)), 0);
+  } else fitToContest(0);
+}
+
+/** Features for precincts that actually have the selected contest. A congressional
+    or legislative race covers only part of the county, so fitting the whole county
+    leaves the painted area a small blob — a shared link should open on the district
+    the contest is about. */
+function contestFeatures(){
+  if(!state._geo) return [];
+  const P=state.results.precincts;
+  const f=state._geo.features.filter(x=>{
+    const p=P[x.properties.precinct];
+    return p && p.contests && (state.contest in p.contests);
+  });
+  return f.length? f : state._geo.features;
+}
+function fitToContest(duration){ fitTo(contestFeatures(), duration); }
+
+function defaultContest(){
+  const names=Object.keys(state.catalog);
+  const pref=[/^president/i,/^governor$/i,/senator/i,/^proposition|^state proposition/i,/representative/i];
+  for(const rx of pref){ const hit=names.find(n=>rx.test(n)); if(hit) return hit; }
+  return names[0];
+}
+
+const CATLABEL = { federal:"Federal", statewide:"Statewide offices",
+                   proposition:"State propositions", recall:"Statewide recall",
+                   legislative:"State legislature", judicial:"Judicial retention", county:"County" };
+function buildContestPicker(){
+  const sel=document.getElementById("contestSel");
+  sel.innerHTML="";
+  const groups={};
+  for(const [n,c] of Object.entries(state.catalog)) (groups[c.category||"other"] ||= []).push(n);
+  for(const key of ["federal","statewide","recall","proposition","legislative","judicial","county","other"]){
+    if(!groups[key]) continue;
+    const og=document.createElement("optgroup");
+    og.label = CATLABEL[key] || "Other";
+    groups[key].forEach(n=> og.appendChild(new Option(n,n)));
+    sel.appendChild(og);
+  }
+}
+
+/* ---------- render ---------- */
+function render(){
+  const c=cat();
+  const usesChoice = state.mode==="choice" || state.mode==="deviation";
+  document.getElementById("choiceWrap").style.display = usesChoice? "block":"none";
+  if(!choiceValid()) state.choice = leadingChoice();
+  if(usesChoice) buildChoicePicker();
+
+  const tb=document.getElementById("turnoutBtn");
+  const noTurnout=!hasTurnout();
+  tb.disabled = noTurnout;
+  tb.title = noTurnout? "This election's canvass has no registration column" : "";
+  if(noTurnout && state.mode==="turnout"){ state.mode="winner"; syncModes(); }
+
+  const pn=document.getElementById("partyNote");
+  if(isParty(state.contest)){
+    pn.style.display="block";
+    pn.innerHTML = "⚑ Party primary ballot — only this party's voters received it, so shares are <b>within-party</b>.";
+  } else pn.style.display="none";
+
+  const paint=()=>{ try{ paintChoropleth(); setHighlights(); }
+    catch(e){ console.error("paint skipped:", e && e.message); } };
+  if(map.isStyleLoaded() && map.getSource("precincts")) paint();
+  else map.once("idle", paint);
+
+  if(map.getLayer("cities-focus"))
+    map.setFilter("cities-focus", ["==",["get","city"], state.city||"__none__"]);
+
+  buildLegend();
+  buildPanel();
+  updateHash();
+}
+
+function buildChoicePicker(){
+  const sel=document.getElementById("choiceSel");
+  sel.innerHTML="";
+  const tot=countyTotal(state.contest).choices||{};
+  const ordered=(cat().choices||[]).slice().sort((a,b)=>(tot[b]||0)-(tot[a]||0));
+  ordered.forEach(ch=>{
+    const d=sumv(tot);
+    sel.add(new Option(`${ch} — ${fpct(pct(tot[ch]||0,d))} countywide`, ch));
+  });
+  sel.value=state.choice;
+}
+
+function paintChoropleth(){
+  const P=state.results.precincts, c=cat();
+  const setC=(pid,color)=>map.setFeatureState({source:"precincts", id:pid},{color});
+  const cmap=colorMap();
+  const lump=new Set(topChoices(7));
+
+  if(state.mode==="deviation"){
+    const ct=countyTotal(state.contest);
+    const base={ p: pct(ct.choices[state.choice]||0, sumv(ct.choices))/100, n: sumv(ct.choices) };
+    for(const [pid,p] of Object.entries(P)){
+      const e=p.contests[state.contest];
+      if(!e){ setC(pid,NODATA); continue; }
+      const n=sumv(e.choices);
+      if(!n || !base.n){ setC(pid,NEUTRAL); continue; }
+      const pr=(e.choices[state.choice]||0)/n, diff=pr-base.p;
+      const se=Math.sqrt(pr*(1-pr)/n + base.p*(1-base.p)/base.n);
+      const ok = Math.abs(diff)>1.96*se && Math.abs(diff)>=MATERIAL;
+      setC(pid, ok? divColor(diff/DEV_MAX) : NEUTRAL);
+    }
+    return;
+  }
+  for(const [pid,p] of Object.entries(P)){
+    if(state.mode==="turnout"){
+      setC(pid, p.registered? rampColor(p.ballots_cast/p.registered) : NODATA);
+      continue;
+    }
+    const e=p.contests[state.contest];
+    if(!e){ setC(pid,NODATA); continue; }
+    if(state.mode==="winner"){
+      const [w]=winnerOf(e.choices, c.kind==="measure"? null : lump);
+      setC(pid, cmap[w] || "#bbb");
+    } else if(state.mode==="margin"){
+      const m=marginOf(e.choices);
+      setC(pid, m==null? NEUTRAL : rampColor(m));
+    } else { // choice
+      const n=sumv(e.choices);
+      setC(pid, n? rampColor((e.choices[state.choice]||0)/n) : NEUTRAL);
+    }
+  }
+}
+
+function setHighlights(){
+  const group=new Set(state.city? (state.results.cities[state.city]||[]) : []);
+  for(const pid of Object.keys(state.results.precincts))
+    map.setFeatureState({source:"precincts", id:pid},
+      {sel: pid===state.focus?2:(group.has(pid)?1:0)});
+}
+
+/* ---------- legend ---------- */
+const gradBar = labels =>
+  `<div style="height:12px;border-radius:3px;background:linear-gradient(90deg,${RAMP.join(",")})"></div>`+
+  `<div style="display:flex;justify-content:space-between;font-size:11px;color:#595959;margin-top:2px">`+
+  labels.map(l=>`<span>${l}</span>`).join("")+`</div>`;
+const divBar = labels =>
+  `<div style="height:12px;border-radius:3px;background:linear-gradient(90deg,${divColor(-1)},${NEUTRAL} 50%,${divColor(1)})"></div>`+
+  `<div style="display:flex;justify-content:space-between;font-size:11px;color:#595959;margin-top:2px">`+
+  labels.map(l=>`<span>${l}</span>`).join("")+`</div>`;
+const noDataRow = `<div class="row" style="margin-top:4px"><span class="sw" style="background:${NODATA}"></span>not on this ballot</div>`;
+
+function buildLegend(){
+  const el=document.getElementById("legend"), c=cat();
+  if(state.mode==="deviation"){
+    el.innerHTML = `<div style="font-weight:600;margin-bottom:4px">vs countywide · ${esc(state.choice)}</div>`
+      + divBar(["−15","below","same","above","+15"])
+      + `<div style="font-size:11px;color:#595959;margin-top:3px"><b>Blue</b> = clearly above the county average · <b>brown</b> = clearly below. Grey = small gap, or within normal variation.</div>`
+      + noDataRow;
+  } else if(state.mode==="turnout"){
+    const anyOver=Object.values(state.results.precincts).some(overReg);
+    el.innerHTML = `<div style="font-weight:600;margin-bottom:4px">Turnout (ballots / registered)</div>`
+      + gradBar(["0%","25%","50%","75%","100%+"])
+      + (anyOver? `<div style="font-size:11px;color:#8a5a00;margin-top:3px">Some precincts exceed 100% — California allows same-day registration.</div>`:"");
+  } else if(state.mode==="margin"){
+    el.innerHTML = `<div style="font-weight:600;margin-bottom:4px">Winner's margin over runner-up</div>`
+      + gradBar(["0","25","50","75","100 pts"]) + noDataRow;
+  } else if(state.mode==="choice"){
+    el.innerHTML = `<div style="font-weight:600;margin-bottom:4px">% for ${esc(state.choice)}</div>`
+      + gradBar(["0%","","50%","","100%"]) + noDataRow;
+  } else {
+    const cmap=colorMap();
+    const shown = c.kind==="measure" ? (c.choices||[]) : topChoices(7).concat([OTHER]);
+    el.innerHTML = `<div style="font-weight:600;margin-bottom:4px">Leading choice</div>`
+      + shown.map(ch=>`<div class="row"><span class="sw" style="background:${cmap[ch]||"#bbb"}"></span>${esc(ch)}</div>`).join("")
+      + noDataRow;
+  }
+}
+
+/* ---------- panel ---------- */
+function resultsTable(choices, cmap, limit){
+  const d=sumv(choices);
+  let rows=Object.entries(choices||{}).sort((a,b)=>b[1]-a[1]);
+  const total=rows.length;
+  if(limit && rows.length>limit){
+    const head=rows.slice(0,limit);
+    const rest=rows.slice(limit).reduce((a,[,v])=>a+v,0);
+    rows=head.concat(rest? [[`${total-limit} others`,rest]] : []);
+  }
+  const top=rows.length? rows[0][1] : 0;
+  return `<table class="res">` + rows.map(([ch,v],i)=>
+    `<tr class="${i===0&&v===top?"win":""}"><td>${esc(ch)}`
+    + `<div class="bar"><span style="width:${pct(v,d).toFixed(1)}%;background:${(cmap&&cmap[ch])||"#9a9a94"}"></span></div></td>`
+    + `<td class="v">${fmt(v)}</td><td class="p">${fpct(pct(v,d),1)}</td></tr>`).join("")
+    + `</table>`;
+}
+
+function metricFor(choices, reg, cast){
+  // the number shown next to a city / precinct, matching the active map mode
+  if(state.mode==="turnout") return reg? {txt:fpct(pct(cast,reg)), v:cast/reg} : {txt:"—", v:-1};
+  if(!choices || !sumv(choices)) return {txt:"—", v:-1};
+  const d=sumv(choices);
+  if(state.mode==="margin"){ const m=marginOf(choices); return {txt:(m*100).toFixed(1)+" pts", v:m}; }
+  if(state.mode==="choice"||state.mode==="deviation"){
+    const p=pct(choices[state.choice]||0,d); return {txt:fpct(p), v:p/100};
+  }
+  const [w,v]=winnerOf(choices);
+  return {txt:`${w} ${fpct(pct(v,d))}`, v:v/d};
+}
+
+function buildPanel(){
+  const el=document.getElementById("panel");
+  const c=cat(), meta=elections.find(e=>e.id===state.election);
+  const head = state.city ? cityView(c,meta) : countyView(c,meta);
+  el.innerHTML = head + creditBlock(meta);
+  wirePanel();
+}
+
+function contestHeader(c){
+  const ct=countyTotal(state.contest);
+  const cmap=colorMap();
+  const limit = c.kind==="measure"? null : 8;
+  return `<div class="contestTitle"><b>${esc(state.contest)}</b>`
+    + (c.rcv? ` <span style="font-size:11px;color:#8a5a00">(1st choice)</span>`:"")
+    + `</div>`
+    + `<div class="subtotal"><div class="lbl">Countywide</div>`
+    + resultsTable(ct.choices, cmap, limit)
+    + `<div style="font-size:11px;color:#6b6b6b;margin-top:4px">${fmt(sumv(ct.choices))} votes cast in this contest</div>`
+    + `</div>`;
+}
+
+function countyView(c,meta){
+  const T=state.results.turnout||{county:{},cities:{}};
+  const cities=Object.keys(state.results.cities).sort();
+  const rows=cities.map(city=>{
+    const ct=cityTotal(state.contest,city);
+    const t=(T.cities||{})[city]||{};
+    const m=metricFor(ct&&ct.choices, t.registered, t.ballots_cast);
+    return {city, m, n:(state.results.cities[city]||[]).length,
+            votes: ct? sumv(ct.choices):0, t};
+  }).sort((a,b)=> b.m.v-a.m.v);
+
+  const label = state.mode==="turnout"? "Turnout"
+    : state.mode==="margin"? "Margin"
+    : (state.mode==="choice"||state.mode==="deviation")? `% ${state.choice}`
+    : "Leader";
+
+  return `<div class="dhead"><h2>Alameda County</h2>`
+    + `<span class="mem">${fmt(Object.keys(state.results.precincts).length)} precincts</span></div>`
+    + `<div class="vintage">${esc(meta.name)} · precinct geometry as published for this election</div>`
+    + contestHeader(c)
+    + (T.county && T.county.registered
+        ? `<div class="card"><div class="lbl">Countywide turnout</div>`
+          + `<b style="font-size:15px">${fpct(pct(T.county.ballots_cast,T.county.registered))}</b>`
+          + ` <span style="font-size:12px;color:#6b6b6b">${fmt(T.county.ballots_cast)} of ${fmt(T.county.registered)} registered</span></div>`
+        : "")
+    + `<div class="lbl" style="margin-top:14px">By jurisdiction · ${esc(label)}</div>`
+    + rows.map(r=>
+        `<button class="cityrow" data-city="${esc(r.city)}">`
+        + `<span class="top"><span class="cn">${esc(r.city)}</span><span class="mv">${esc(r.m.txt)}</span></span>`
+        + `<span class="sub2">${r.n} precinct${r.n===1?"":"s"}`
+        + (r.votes? ` · ${fmt(r.votes)} votes`:" · not on this ballot")
+        + `</span></button>`).join("")
+    + `<div style="font-size:11px;color:#6b6b6b;margin-top:10px">Jurisdiction comes from the city
+        contests each precinct votes in, with the county's city outlines as fallback.
+        “Unincorporated” is county territory outside any city.</div>`;
+}
+
+function cityView(c,meta){
+  const pids=(state.results.cities[state.city]||[]).slice();
+  const ct=cityTotal(state.contest,state.city);
+  const cmap=colorMap();
+  const T=(state.results.turnout||{}).cities||{};
+  const t=T[state.city]||{};
+  const limit = c.kind==="measure"? null : 8;
+
+  pids.sort((a,b)=>{
+    const ea=state.results.precincts[a].contests[state.contest];
+    const eb=state.results.precincts[b].contests[state.contest];
+    return sumv(eb&&eb.choices)-sumv(ea&&ea.choices);
+  });
+
+  let html = `<button class="back" id="backBtn">← All of Alameda County</button>`
+    + `<div class="dhead"><h2>${esc(state.city)}</h2>`
+    + `<span class="mem">${pids.length} precinct${pids.length===1?"":"s"}</span></div>`
+    + `<div class="vintage">${esc(meta.name)}</div>`
+    + `<div class="contestTitle"><b>${esc(state.contest)}</b></div>`;
+
+  if(ct){
+    html += `<div class="subtotal"><div class="lbl">${esc(state.city)} subtotal</div>`
+      + resultsTable(ct.choices, cmap, limit)
+      + `<div style="font-size:11px;color:#6b6b6b;margin-top:4px">`
+      + `${fmt(sumv(ct.choices))} votes`
+      + (t.registered? ` · turnout ${fpct(pct(t.ballots_cast,t.registered))}`:"")
+      + `</div></div>`;
+  } else {
+    html += `<div class="card note">This contest was not on the ballot in ${esc(state.city)}.</div>`;
+  }
+
+  if(state.mode==="deviation" && ct){
+    const base=countyTotal(state.contest);
+    const bp=pct(base.choices[state.choice]||0,sumv(base.choices))/100;
+    html += `<div class="card"><div class="lbl">vs countywide · ${esc(state.choice)}</div>`
+      + pids.map(pid=>{
+          const e=state.results.precincts[pid].contests[state.contest];
+          if(!e) return "";
+          const n=sumv(e.choices); if(!n) return "";
+          const pr=(e.choices[state.choice]||0)/n, diff=pr-bp;
+          const se=Math.sqrt(pr*(1-pr)/n + bp*(1-bp)/(sumv(base.choices)||1));
+          const ok=Math.abs(diff)>1.96*se && Math.abs(diff)>=MATERIAL;
+          const w=Math.min(50,Math.abs(diff)/DEV_MAX*50);
+          return `<div class="dvrow"><div class="top"><span>${esc(pid)}</span>`
+            + `<span class="dev" style="color:${ok?(diff>0?"#2166ac":"#b35806"):"#8a8a84"}">`
+            + `${diff>0?"+":""}${(diff*100).toFixed(1)} pts${ok?"":" (noise)"}</span></div>`
+            + `<div class="dvbar"><div class="z"></div>`
+            + `<div class="seg" style="${diff>0?`left:50%`:`right:50%`};width:${w}%;`
+            + `background:${ok?(diff>0?"#2166ac":"#b35806"):"#c9c9c4"}"></div></div></div>`;
+        }).join("")
+      + `</div>`;
+  }
+
+  html += `<div class="lbl" style="margin-top:14px">Precincts</div>`;
+  html += pids.map(pid=>{
+    const p=state.results.precincts[pid];
+    const e=p.contests[state.contest];
+    const turn = p.registered? `${fpct(pct(p.ballots_cast,p.registered))} turnout` : "";
+    return `<div class="prec ${pid===state.focus?"focus":""}" id="prec-${esc(pid)}">`
+      + `<button class="ph" data-pid="${esc(pid)}">`
+      + `<span class="pid">${esc(pid)}</span>`
+      + `<span class="turn">${turn}${overReg(p)?" ⚑":""}</span></button>`
+      + (e? resultsTable(e.choices, cmap, limit)
+          : `<div style="font-size:12px;color:#6b6b6b;font-style:italic;margin-top:4px">not on this ballot</div>`)
+      + `</div>`;
+  }).join("");
+  return html;
+}
+
+function creditBlock(meta){
+  const s=meta.sources||{};
+  return `<div class="credit">
+    <b>${esc(meta.name)}</b><br>
+    Contests shown: statewide offices, Congress and state propositions only — see the
+    <a href="./index.html" class="src">Berkeley map</a> for local races.<br>
+    Tallies: Alameda County Registrar of Voters, Statement of Vote${s.election_page?` (<a class="src" href="${esc(s.election_page)}" target="_blank" rel="noopener">election page</a>)`:""}.<br>
+    Precinct geometry: Alameda County Open Data Hub, as published for this election.<br>
+    Basemap © OpenStreetMap contributors, © CARTO.
+    ${(state.manifest.pending||[]).length? `<br><br><b>Not yet mappable:</b> `
+      + (state.manifest.pending||[]).map(p=>`${esc(p.name)} — ${esc(p.reason)}`).join("; ")+"." : ""}
+  </div>`;
+}
+
+function wirePanel(){
+  document.querySelectorAll(".cityrow").forEach(b=> b.onclick=()=>{
+    state.city=b.dataset.city; state.focus=null; render();
+    const feats=state._geo.features.filter(f=>{
+      const p=state.results.precincts[f.properties.precinct];
+      return p && p.city===state.city; });
+    fitTo(feats);
+  });
+  const back=document.getElementById("backBtn");
+  if(back) back.onclick=()=>{ state.city=null; state.focus=null; render(); fitToContest(); };
+  document.querySelectorAll(".prec .ph").forEach(b=> b.onclick=()=>{
+    state.focus=b.dataset.pid; render();
+    const f=state._geo.features.find(x=>x.properties.precinct===state.focus);
+    if(f) fitTo([f]);
+  });
+}
+
+function syncModes(){
+  document.querySelectorAll('.modes button[data-mode]').forEach(b=>
+    b.classList.toggle("active", b.dataset.mode===state.mode));
+}
+function wireControls(){
+  document.getElementById("electionSel").onchange = async e=>{
+    state.focus=null;
+    await loadElection(e.target.value);
+  };
+  document.getElementById("contestSel").onchange = e=>{
+    state.contest=e.target.value; state.choice=null; render(); fitToContest();
+  };
+  document.querySelectorAll('.modes button[data-mode]').forEach(b=> b.onclick=()=>{
+    if(b.disabled) return;
+    state.mode=b.dataset.mode; syncModes(); render();
+  });
+  document.getElementById("choiceSel").onchange = e=>{ state.choice=e.target.value; render(); };
+  document.getElementById("resetView").onclick = ()=>{
+    state.city=null; state.focus=null; render(); fitToContest();
+  };
+  document.getElementById("shareBtn").onclick = async ()=>{
+    updateHash();                       // make sure the link reflects what is on screen
+    const btn=document.getElementById("shareBtn"), url=location.href;
+    const done=ok=>{ btn.textContent = ok? "✓ Link copied" : "⚠ Copy failed — select the URL bar";
+      setTimeout(()=>btn.textContent="🔗 Copy link to this map", 2200); };
+    try { await navigator.clipboard.writeText(url); done(true); }
+    catch(e){
+      // clipboard API needs a secure context; fall back to a selectable textarea
+      try { const t=document.createElement("textarea"); t.value=url;
+        t.style.position="fixed"; t.style.opacity="0"; document.body.appendChild(t);
+        t.select(); const ok=document.execCommand("copy"); document.body.removeChild(t); done(ok); }
+      catch(_){ done(false); }
+    }
+  };
+  document.getElementById("aboutBtn").onclick = ()=> document.getElementById("about").style.display="flex";
+  document.getElementById("aboutOk").onclick  = ()=> document.getElementById("about").style.display="none";
+  document.getElementById("about").onclick = e=>{
+    if(e.target.id==="about") document.getElementById("about").style.display="none"; };
+  document.addEventListener("keydown", e=>{
+    if(e.key==="Escape") document.getElementById("about").style.display="none"; });
+  syncModes();
+}
+
+boot();
+</script>
+</body>
+</html>

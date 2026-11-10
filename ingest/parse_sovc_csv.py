@@ -14,8 +14,12 @@ Usage:
 """
 import csv
 import json
+import os
 import re
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from parse_canvass import AGGREGATE_COLS  # noqa: E402
 
 
 def as_int(v):
@@ -97,6 +101,8 @@ def main():
             contest = str(row[c["contest"]]).strip()
             cand = str(row[c["cand"]]).strip()
             if not contest or not cand:
+                continue
+            if cand.lower() in AGGREGATE_COLS:   # per-contest total row, not a choice
                 continue
             rcv = "(RCV)" in contest
             name = re.sub(r"\s*\(RCV\)\s*$", "", contest).strip()
