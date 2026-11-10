@@ -202,6 +202,41 @@
 </div></div>
 <script>
 const DATA = "./data";
+const EMBED_PAGE = "index";
+/* ---- embedding (samkp.com wraps this page in an iframe) ----------------------
+   A deep link shared from samkp.com has to reopen the same view, and "copy link"
+   has to hand back the samkp.com URL, not the github.io one. So the parent is told
+   the hash on every change, and is asked for its own URL when copying. Only the
+   origins listed here are trusted, and only the hash — which is not sensitive — is
+   ever sent. Standalone (unframed) use is unaffected. */
+const EMBED_PARENTS = ["https://samkp.com", "https://www.samkp.com"];
+const FRAMED = (()=>{ try { return !!window.parent && window.parent !== window; } catch(e){ return false; } })();
+let _shareWaiters = [];
+if(FRAMED) window.addEventListener("message", ev=>{
+  if(!EMBED_PARENTS.includes(ev.origin)) return;
+  const d = ev.data || {};
+  if(d.type === "bpm:share-url" && typeof d.url === "string"){
+    const w = _shareWaiters; _shareWaiters = []; w.forEach(fn=>fn(d.url));
+  }
+});
+function notifyParent(){
+  if(!FRAMED) return;
+  for(const o of EMBED_PARENTS){
+    try { window.parent.postMessage({type:"bpm:hash", page:EMBED_PAGE, hash:location.hash}, o); } catch(e){}
+  }
+}
+function shareUrl(){
+  if(!FRAMED) return Promise.resolve(location.href);
+  return new Promise(res=>{
+    let done=false; const finish=u=>{ if(!done){ done=true; res(u); } };
+    _shareWaiters.push(finish);
+    for(const o of EMBED_PARENTS){
+      try { window.parent.postMessage({type:"bpm:share-url-request"}, o); } catch(e){}
+    }
+    setTimeout(()=>finish(location.href), 400);   // no answer: fall back to our own URL
+  });
+}
+
 // Okabe–Ito colorblind-safe qualitative palette (first 7), then neutral grays for overflow.
 const CAT = ["#0072B2","#E69F00","#009E73","#CC79A7","#56B4E9","#D55E00","#F0E442","#8c8c8c","#7d5aa6","#4d4d4d"];
 const YESNO = { "YES":"#2b8cbe", "NO":"#e08214" };
@@ -575,6 +610,21 @@ function buildContestPicker(){
   grp("County · State · Federal · Props", rest.filter(n=>!/Berkeley/.test(n)));
   sel.value=state.contest;
 }
+/* Candidate slugs must survive across cycles: the county prefixes choices with the
+   party in some elections and not others (e.g. "DEM - LATEEFAH SIMON" in Nov 2024,
+   plain "Lateefah Simon" in Nov 2026). Links are written party-free and read
+   tolerantly, so older prefixed links keep working too. */
+const PARTY_PREFIX = /^[A-Z]{2,4}\s*-\s*/i;
+const SLUG_PARTY = /^(dem|rep|grn|lib|pf|ai|npp|aip|ref)-/;
+const bareSlug = c => slug(String(c).replace(PARTY_PREFIX, ""));
+function resolveChoice(slugged, choices){
+  if(!slugged) return null;
+  const bare = slugged.replace(SLUG_PARTY, "");
+  return choices.find(c=>slug(c)===slugged)
+      || choices.find(c=>bareSlug(c)===slugged)
+      || choices.find(c=>bareSlug(c)===bare)
+      || null;
+}
 function choiceValid(){ return state.catalog[state.contest].choices.includes(state.choice); }
 function buildChoicePicker(){
   const sel=document.getElementById("choiceSel"); sel.innerHTML="";
@@ -593,7 +643,7 @@ function render(){
   if (isPending()) { renderPending(); return; }
   setControlsEnabled(true);                 // undo the pending-election lockout
   if (state._pendingContestSlug){ const m=Object.keys(state.catalog).find(n=>slug(n)===state._pendingContestSlug); if(m)state.contest=m; state._pendingContestSlug=null; }
-  if (state._pendingChoiceSlug){ const m=(state.catalog[state.contest]?.choices||[]).find(c=>slug(c)===state._pendingChoiceSlug); if(m)state.choice=m; state._pendingChoiceSlug=null; }
+  if (state._pendingChoiceSlug){ const m=resolveChoice(state._pendingChoiceSlug, state.catalog[state.contest]?.choices||[]); if(m)state.choice=m; state._pendingChoiceSlug=null; }
 
   updateAlignVisibility();
   const cat=state.catalog[state.contest];
@@ -913,7 +963,7 @@ function wireControls(){
   document.getElementById("resetView").onclick=fitToPrecincts;
   document.getElementById("shareBtn").onclick=async ()=>{
     updateHash();                      // link reflects exactly what is on screen
-    const btn=document.getElementById("shareBtn"), url=location.href;
+    const btn=document.getElementById("shareBtn"), url=await shareUrl();
     const done=ok=>{ btn.textContent = ok? "✓ Link copied" : "⚠ Copy failed — select the URL bar";
       setTimeout(()=>btn.textContent="🔗 Copy link to this map", 2200); };
     try { await navigator.clipboard.writeText(url); done(true); }
@@ -999,12 +1049,13 @@ function exportAlignment(){
 
 function updateHash(){
   // a pending election has no contest/mode state worth linking to
-  if(isPending()){ history.replaceState(null,"","#"+state.election); return; }
+  if(isPending()){ history.replaceState(null,"","#"+state.election); notifyParent(); return; }
   const parts=[state.election, slug(state.contest), state.mode];
-  if(state.mode==="choice"||state.mode==="deviation") parts.push(slug(state.choice));
+  if(state.mode==="choice"||state.mode==="deviation") parts.push(bareSlug(state.choice));  // party-free: durable across cycles
   if(state.mode==="deviation") parts.push("b-"+state.baseline);
   if(state.district) parts.push("d"+state.district);
   history.replaceState(null,"","#"+parts.join("/"));
+  notifyParent();
 }
 function parseHash(){
   const h=location.hash.replace(/^#/,"").split("/").filter(Boolean);

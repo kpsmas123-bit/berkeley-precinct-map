@@ -127,15 +127,46 @@ and the panel shows the county's running count with its "Preliminary/Unofficial 
 portal reports county and state contests countywide, and a countywide number on a
 Berkeley map would be false.
 
-Re-run `./build.sh 2026-11-general` any time to refresh the totals. To finish the
-election once the SOV lands:
+Re-run `./build.sh 2026-11-general` any time to refresh the citywide totals.
 
-1. add `sov` and `district_canvass_xlsx` to its `sources` in `data/processed/elections.json`,
-2. delete its `"precinct_results": false` line,
-3. `./build.sh 2026-11-general && ./build_county.sh 2026-11-general`.
+**To finish the election once the county certifies** (~30 days after election day):
+
+```bash
+.venv/bin/python ingest/discover_sources.py 2026-11-general   # finds the canvass URLs
+./build.sh 2026-11-general && ./build_county.sh 2026-11-general
+git add -A && git commit -m "Nov 2026 precinct results" && git push origin main
+```
+
+`discover_sources.py` reads the county's election page, finds the precinct and district
+canvass links, writes them into the manifest and clears the `precinct_results: false`
+flag. It is safe to run early — if the canvass is not up yet it says so and changes
+nothing. It exists because the county does not keep one URL convention: Nov 2024
+published to `SOV/<date>/Statement of Vote - General Election.xlsx` and June 2026 to
+`PDFs/<date>/Results/PrecinctCanvassJun02.xlsx`.
 
 The precinct geometry is already downloaded and mapped, so the map fills in with no
-frontend change.
+frontend change — and the election joins the countywide map at the same time.
+
+### Shareable links
+
+Both maps keep their full state in the URL hash, so any view can be linked:
+
+```
+site/index.html#<election>/<contest>/<mode>[/<choice>][/b-<baseline>][/d<district>]
+site/county.html#<election>/<contest>/<mode>[/c-<choice>][/<city>]
+```
+
+Embedded on samkp.com the same views are reachable as
+`samkp.com/precinct-map.html#<berkeley hash>` and
+`samkp.com/precinct-map.html#county/<county hash>`; the embedded map posts its hash to
+the parent page, which keeps the address bar in step and answers the map's "copy link"
+button with the samkp.com URL. Only that origin is trusted, and only the hash is sent.
+
+**Candidate slugs are written without the party prefix** (`c-lateefah-simon`, not
+`c-dem-lateefah-simon`) and read tolerantly, because the county prefixes choices with
+the party in some elections and not others — she is `DEM - LATEEFAH SIMON` in the Nov
+2024 canvass and plain `Lateefah Simon` in the Nov 2026 results. Without this a link
+shared in one cycle would break in the next.
 
 `data/processed/elections.json` is the manifest (id, date, name, source URLs, file paths).
 

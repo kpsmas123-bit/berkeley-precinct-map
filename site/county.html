@@ -163,6 +163,41 @@
 
 <script>
 const DATA = "./data/county";
+const EMBED_PAGE = "county";
+/* ---- embedding (samkp.com wraps this page in an iframe) ----------------------
+   A deep link shared from samkp.com has to reopen the same view, and "copy link"
+   has to hand back the samkp.com URL, not the github.io one. So the parent is told
+   the hash on every change, and is asked for its own URL when copying. Only the
+   origins listed here are trusted, and only the hash — which is not sensitive — is
+   ever sent. Standalone (unframed) use is unaffected. */
+const EMBED_PARENTS = ["https://samkp.com", "https://www.samkp.com"];
+const FRAMED = (()=>{ try { return !!window.parent && window.parent !== window; } catch(e){ return false; } })();
+let _shareWaiters = [];
+if(FRAMED) window.addEventListener("message", ev=>{
+  if(!EMBED_PARENTS.includes(ev.origin)) return;
+  const d = ev.data || {};
+  if(d.type === "bpm:share-url" && typeof d.url === "string"){
+    const w = _shareWaiters; _shareWaiters = []; w.forEach(fn=>fn(d.url));
+  }
+});
+function notifyParent(){
+  if(!FRAMED) return;
+  for(const o of EMBED_PARENTS){
+    try { window.parent.postMessage({type:"bpm:hash", page:EMBED_PAGE, hash:location.hash}, o); } catch(e){}
+  }
+}
+function shareUrl(){
+  if(!FRAMED) return Promise.resolve(location.href);
+  return new Promise(res=>{
+    let done=false; const finish=u=>{ if(!done){ done=true; res(u); } };
+    _shareWaiters.push(finish);
+    for(const o of EMBED_PARENTS){
+      try { window.parent.postMessage({type:"bpm:share-url-request"}, o); } catch(e){}
+    }
+    setTimeout(()=>finish(location.href), 400);   // no answer: fall back to our own URL
+  });
+}
+
 // Okabe–Ito colourblind-safe qualitative palette, then neutral greys for overflow.
 const CAT = ["#0072B2","#E69F00","#009E73","#CC79A7","#56B4E9","#D55E00","#F0E442","#8c8c8c","#7d5aa6","#4d4d4d"];
 const YESNO = { "YES":"#2b8cbe", "NO":"#e08214" };
@@ -235,6 +270,22 @@ function marginOf(choices){
   const d = sumv(choices);
   if(!d || v.length<1) return null;
   return (v[0]-(v[1]||0))/d;
+}
+/* Candidate slugs must survive across cycles. The county prefixes choices with the
+   party in some elections and not others — Lateefah Simon is "DEM - LATEEFAH SIMON"
+   in Nov 2024 and plain "Lateefah Simon" in Nov 2026 — so a link shared in one cycle
+   would otherwise break in the next. Links are WRITTEN without the party prefix and
+   READ tolerantly, which also keeps older prefixed links working. */
+const PARTY_PREFIX = /^[A-Z]{2,4}\s*-\s*/i;
+const SLUG_PARTY = /^(dem|rep|grn|lib|pf|ai|npp|aip|ref)-/;
+const bareSlug = c => slug(String(c).replace(PARTY_PREFIX, ""));
+function resolveChoice(slugged, choices){
+  if(!slugged) return null;
+  const bare = slugged.replace(SLUG_PARTY, "");
+  return choices.find(c=>slug(c)===slugged)
+      || choices.find(c=>bareSlug(c)===slugged)
+      || choices.find(c=>bareSlug(c)===bare)
+      || null;
 }
 function choiceValid(){ return state.choice && (cat().choices||[]).includes(state.choice); }
 function leadingChoice(){ const t=topChoices(); return t[0] || (cat().choices||[])[0] || null; }
@@ -321,10 +372,11 @@ function parseHash(){
 function updateHash(){
   const p=[state.election, slug(state.contest||""), state.mode];
   if((state.mode==="choice"||state.mode==="deviation") && state.choice)
-    p.push("c-"+slug(state.choice));
+    p.push("c-"+bareSlug(state.choice));   // party-free: durable across cycles
   if(state.city) p.push(slug(state.city));
   const h="#"+p.join("/");
   if(location.hash!==h) history.replaceState(null,"",h);
+  notifyParent();
 }
 
 function eachCoord(geom,fn){ const walk=a=>{ if(typeof a[0]==="number") fn(a); else a.forEach(walk); }; walk(geom.coordinates); }
@@ -424,7 +476,7 @@ async function loadElection(id){
   }
   if(!state.contest || !(state.contest in state.catalog)) state.contest = defaultContest();
   if(state._pendingChoice){
-    const m=(state.catalog[state.contest]?.choices||[]).find(c=>slug(c)===state._pendingChoice);
+    const m=resolveChoice(state._pendingChoice, state.catalog[state.contest]?.choices||[]);
     if(m) state.choice=m;
     state._pendingChoice=null;
   }
@@ -825,7 +877,7 @@ function wireControls(){
   };
   document.getElementById("shareBtn").onclick = async ()=>{
     updateHash();                       // make sure the link reflects what is on screen
-    const btn=document.getElementById("shareBtn"), url=location.href;
+    const btn=document.getElementById("shareBtn"), url=await shareUrl();
     const done=ok=>{ btn.textContent = ok? "✓ Link copied" : "⚠ Copy failed — select the URL bar";
       setTimeout(()=>btn.textContent="🔗 Copy link to this map", 2200); };
     try { await navigator.clipboard.writeText(url); done(true); }
