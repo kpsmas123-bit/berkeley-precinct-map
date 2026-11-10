@@ -7,6 +7,11 @@
 <link href="./vendor/maplibre-gl.css" rel="stylesheet" />
 <script src="./vendor/maplibre-gl.js"></script>
 <style>
+  .tabs { display:flex; gap:4px; margin:0 0 12px; border-bottom:1px solid var(--line, #e2e2dd); }
+  .tabs button { flex:1 1 0; font:inherit; font-size:12.5px; padding:7px 6px; cursor:pointer;
+    background:none; border:none; border-bottom:2px solid transparent; color:var(--muted, #6b6b6b); }
+  .tabs button.active { color:inherit; font-weight:600; border-bottom-color:currentColor; }
+  .tabs button:focus-visible { outline:2px solid #2166ac; outline-offset:-2px; }
   :root { --panel: 372px; --bg: #f7f7f5; --ink: #1a1a1a; --muted: #6b6b6b; --line: #e2e2dd; --gold:#e8a400;
     --below:#b35806; --above:#2166ac; --neutral:#e8e8e6; }
   * { box-sizing: border-box; }
@@ -178,9 +183,12 @@
     <li>District lines <b>changed in the 2021 redistricting</b>, so "District 1" is a different area before vs. after.</li>
     <li>Older elections had <b>no certified precinct canvass</b>; those totals are shown but marked "not independently reconciled."</li>
     <li>Statewide propositions show <b>only Berkeley's share</b>, not the statewide result.</li>
-    <li>The <b>November 2026</b> election shows <b>citywide totals only</b> — the county does not publish
-        precinct figures until certification, about a month after election day, so there is no precinct
-        pattern to map yet.</li>
+    <li>An election marked <b>preliminary</b> is still being counted. The county does not publish the
+        certified precinct canvass until about a month after election day, but its live results map does
+        carry per-precinct votes for a contest or two — those are mapped for real; every other contest
+        on that ballot is citywide totals only, in the <b>Latest Berkeley totals</b> tab. Per-precinct
+        registration is not published either, so turnout is off for those elections, and every figure is
+        superseded by the certified Statement of Vote.</li>
     <li>For statewide offices, Congress and propositions <b>across all of Alameda County</b>, see the
         <a href="./county.html">county map</a>.</li>
   </ul>
@@ -251,7 +259,8 @@ const overReg = p => p.registered && p.ballots_cast > p.registered;
 
 const state = { election:null, contest:null, mode:"winner", choice:null, baseline:"district",
                 district:null, focus:null, results:null, catalog:null, dmembers:{},
-                alignment:{}, measures:{}, featured:[] };
+                alignment:{}, measures:{}, featured:[], tab:"map" };
+const TABS = ["map","latest"];
 let map, elections;
 
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
@@ -363,7 +372,8 @@ async function boot() {
   try { state.measures  = await (await fetch(`${DATA}/measures.json`)).json();  } catch(e){ state.measures={}; }
   try { state.featured  = (await (await fetch(`${DATA}/featured.json`)).json()).featured||[]; } catch(e){ state.featured=[]; }
   const esel = document.getElementById("electionSel");
-  elections.forEach(e => esel.add(new Option(e.name, e.id)));
+  elections.forEach(e => esel.add(new Option(
+    e.name + (e.precinct_results === false ? "  — preliminary" : ""), e.id)));
   map = new maplibregl.Map({
     container: "map",
     style: { version:8,
@@ -505,6 +515,13 @@ async function loadElection(id) {
    precinct pattern, so the choropleth is switched off rather than filled with a
    guess, and the panel shows the citywide count with its "as of" stamp. */
 const isPending = () => !!(state.results && state.results.precinct_results === false);
+/* "partial": the certified canvass is still out, but the county's live results map
+   publishes per-precinct votes for at least one contest on this ballot — Berkeley is
+   in CD-12, which it does not map, yet a countywide measure covers all 31 precincts.
+   Those contests behave exactly like certified ones; everything else on the ballot
+   stays citywide and lives in the second panel tab. */
+const isPartial = () => !!(state.results && state.results.precinct_results === "partial");
+const livePrecincts = () => (state.results && state.results.live) || {};
 const PENDING_WASH = "#e6ddc7";
 
 function setControlsEnabled(on){
@@ -544,7 +561,7 @@ function needFraction(threshold){          // "Needs 2/3 majority Yes votes to p
   return null;
 }
 
-function pendingPanelHtml(){
+function pendingPanelHtml(partial){
   const cw = state.results.citywide || {};
   const meta = elections.find(e=>e.id===state.election) || {};
   const contests = cw.contests || [];
@@ -558,16 +575,25 @@ function pendingPanelHtml(){
     return {y,n,share,need, passing: need==null? null : share>=need};
   };
 
-  let html = `<div class="dhead"><h2>${esc(meta.name||"November 3, 2026")}</h2>`
-    + `<span class="mem">citywide only</span></div>`
+  const mapped = partial ? Object.keys(state.catalog) : [];
+  let html = `<div class="dhead"><h2>${partial? "Latest Berkeley totals" : esc(meta.name||"November 3, 2026")}</h2>`
+    + `<span class="mem">${contests.length} contest${contests.length===1?"":"s"}</span></div>`
     + `<div class="vintage">${esc(cw.status||"Preliminary/Unofficial")}`
     + (cw.county_last_updated? ` · county last updated ${esc(cw.county_last_updated)}` : "")
     + `</div>`
     + `<div class="card" style="background:#fff7e6;border-color:#f0d9a8;color:#8a5a00;font-size:12.5px;line-height:1.5">`
-    + `<b>Precinct-level results aren't published yet.</b> Alameda County releases the `
-    + `precinct Statement of Vote at certification, about a month after election day, so there `
-    + `is no precinct pattern to map — the map is deliberately blank rather than guessing. `
-    + `The totals below are the county's running count for Berkeley-only contests.</div>`;
+    + (partial
+        ? `<b>Citywide totals — no precinct breakdown for these.</b> The county publishes `
+          + `precinct-level figures before certification only for the contests on its own live `
+          + `results map, which here means `
+          + mapped.map(n=>`<b>${esc(n)}</b>`).join(" and ")
+          + `. Everything below is Berkeley's running citywide count; precinct figures arrive `
+          + `with the certified Statement of Vote, about a month after election day.`
+        : `<b>Precinct-level results aren't published yet.</b> Alameda County releases the `
+          + `precinct Statement of Vote at certification, about a month after election day, so there `
+          + `is no precinct pattern to map — the map is deliberately blank rather than guessing. `
+          + `The totals below are the county's running count for Berkeley-only contests.`)
+    + `</div>`;
 
   for(const c of contests){
     const total = c.total_votes || c.choices.reduce((a,r)=>a+r.votes,0);
@@ -662,6 +688,15 @@ function render(){
   if (state._pendingChoiceSlug){ const m=resolveChoice(state._pendingChoiceSlug, state.catalog[state.contest]?.choices||[]); if(m)state.choice=m; state._pendingChoiceSlug=null; }
 
   updateAlignVisibility();
+  // Neither live feed carries per-precinct registration, so a preliminary election
+  // has nothing to colour a turnout map with.
+  const tb=document.querySelector('.modes button[data-mode="turnout"]');
+  if(tb){
+    const noTurnout=Object.values(state.results.precincts).every(p=>!p.registered);
+    tb.disabled=noTurnout;
+    tb.title=noTurnout? "No per-precinct registration published for this election yet" : "";
+    if(noTurnout && state.mode==="turnout"){ state.mode="winner"; syncModeButtons(); }
+  }
   const cat=state.catalog[state.contest];
   const usesChoice = state.mode==="choice"||state.mode==="deviation";
   document.getElementById("rcvNote").style.display = cat.rcv?"block":"none";
@@ -683,8 +718,51 @@ function render(){
   if(map.isStyleLoaded() && map.getSource("precincts")) paintMap();
   else map.once("idle", paintMap);   // repaint once the style/tiles settle (resilient to flaky CDNs)
   buildLegend(colorForContest());
-  showDistrict();
+  if(isPartial() && state.tab==="latest"){
+    const panel=document.getElementById("panel");
+    panel.innerHTML = pendingPanelHtml(true);
+    panel.insertAdjacentHTML("afterbegin", tabStrip());
+  } else {
+    showDistrict();
+    // insertAdjacentHTML rather than rewriting innerHTML: showDistrict() has just
+    // wired its own click handlers and reassigning would throw them away.
+    if(isPartial())
+      document.getElementById("panel")
+        .insertAdjacentHTML("afterbegin", tabStrip() + partialBanner());
+  }
+  if(isPartial()) wireTabs();
   updateHash();
+}
+
+function tabStrip(){
+  const n=(state.results.citywide||{}).contests||[];
+  const t=(id,label)=>`<button type="button" data-tab="${id}" class="${state.tab===id?"active":""}">${label}</button>`;
+  return `<div class="tabs">` + t("map","Precinct detail")
+    + t("latest",`Latest Berkeley totals${n.length?` (${n.length})`:""}`) + `</div>`;
+}
+function wireTabs(){
+  document.querySelectorAll('#panel .tabs button[data-tab]').forEach(b=> b.onclick=()=>{
+    if(state.tab===b.dataset.tab) return;
+    state.tab=b.dataset.tab; render();
+  });
+}
+function partialBanner(){
+  const cw=state.results.citywide||{}, live=livePrecincts();
+  const mapped=Object.keys(state.catalog);
+  const other=((cw.contests||[]).length);
+  const feed=live._feed||{};
+  return `<div class="card" style="background:#fff7e6;border-color:#f0d9a8;color:#8a5a00;font-size:12.5px;line-height:1.5">`
+    + `<b>${esc(cw.status||"Preliminary/Unofficial")}</b>`
+    + (cw.county_last_updated? ` · county last updated ${esc(cw.county_last_updated)}`:"")
+    + `<br>The certified precinct canvass is still a few weeks out, but the county's live
+       results map does publish per-precinct votes for `
+    + (mapped.length===1? `one contest on this ballot` : `${mapped.length} contests on this ballot`)
+    + ` — so ${mapped.length===1?"it is":"they are"} mapped for real here. The other
+       <b>${other}</b> Berkeley contest${other===1?"":"s"} ${other===1?"is":"are"} citywide totals only;
+       ${other===1?"it is":"they are"} in the <b>Latest Berkeley totals</b> tab.`
+    + `<br>Registration is not published per precinct yet, so turnout is off.`
+    + (feed.url? ` <a class="src" href="${esc(feed.url)}" target="_blank" rel="noopener">results-map feed</a>`:"")
+    + `</div>`;
 }
 
 function paintChoropleth(cmap){
@@ -937,7 +1015,12 @@ function showDistrict(){
     const over=overReg(p); if(over) anyOver=true;
     html+=`<div class="prec ${pid===state.focus?"focus":""}" data-pid="${pid}">`
       + `<button class="ph" type="button" aria-label="Precinct ${esc(pid)} details"><span class="pid">Precinct ${esc(pid)}</span>`
-      + `<span class="turn"${over?` title="${esc(OVER_NOTE)}"`:""}>turnout ${tpct}%${over?` <span style="color:#8a5a00">†</span>`:""} · ${(p.ballots_cast||0).toLocaleString()}/${(p.registered||0).toLocaleString()}</span></button>`;
+      // no registration published (a preliminary election) -> show the votes counted
+      // here instead of an empty "turnout —% · 0/0"
+      + (p.registered
+          ? `<span class="turn"${over?` title="${esc(OVER_NOTE)}"`:""}>turnout ${tpct}%${over?` <span style="color:#8a5a00">†</span>`:""} · ${(p.ballots_cast||0).toLocaleString()}/${(p.registered||0).toLocaleString()}</span>`
+          : `<span class="turn">${c? sumv(c.choices).toLocaleString()+" votes" : ""}</span>`)
+      + `</button>`;
     if(c){ const [win]=winnerOf(c.choices); html+=resultsTable(c.choices,cmap,win); }
     else html+=`<div class="noballot">not on this precinct’s ballot</div>`;
     html+=`</div>`;
@@ -1069,6 +1152,7 @@ function updateHash(){
   const parts=[state.election, slug(state.contest), state.mode];
   if(state.mode==="choice"||state.mode==="deviation") parts.push(bareSlug(state.choice));  // party-free: durable across cycles
   if(state.mode==="deviation") parts.push("b-"+state.baseline);
+  if(isPartial() && state.tab!=="map") parts.push("t-"+state.tab);
   if(state.district) parts.push("d"+state.district);
   history.replaceState(null,"","#"+parts.join("/"));
   notifyParent();
@@ -1081,6 +1165,7 @@ function parseHash(){
   const btok=h.find(t=>/^b-(district|city)$/.test(t)); if(btok) state.baseline=btok.slice(2);
   syncBaselineButtons();
   const dtok=h.find(t=>/^d\d+$/.test(t)); if(dtok) state.district=dtok.slice(1);   // district keys are numeric 1..8
+  const ttok=h.find(t=>/^t-/.test(t)); state.tab = ttok && TABS.includes(ttok.slice(2)) ? ttok.slice(2) : "map";
   state._pendingContestSlug=h[1]; state._pendingChoiceSlug=((state.mode==="choice"||state.mode==="deviation")?h[3]:null);
 }
 

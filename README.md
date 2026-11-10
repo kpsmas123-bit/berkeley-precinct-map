@@ -129,16 +129,27 @@ Alameda County publishes the precinct-level Statement of Vote only at or near
 certification, roughly 30 days after election day. Until then the county publishes **two**
 machine-readable feeds, and they carry different things:
 
+`ingest/live_map_feed.py` holds the parse for the second feed; both builds import it, so
+there is one parser rather than two that can drift apart. Run it directly to see what the
+county is currently mapping.
+
 | Feed | What it has | What it is missing |
 |------|-------------|--------------------|
 | `alamedacountyca.gov/rovresults/<id>/` — the results portal | every contest on the ballot, countywide totals, the "Preliminary/Unofficial — Update #N / Last Updated" stamp, registration and turnout | any geography at all |
 | `electionmaps.alamedacountyca.gov/json/electionResults.json` — the feed behind the county's own results map | **per-precinct votes**, and each precinct's reporting status | all but the one or two contests the county chooses to map (Nov 2026: CD-14 and Measure RTM) |
 
-**The Berkeley map** (`index.html`) uses the portal only. Its choropleth stays blank
-rather than filled with a guess, the mode buttons and contest picker are disabled, and the
-panel shows the county's running count with its update stamp. Only contests whose
-jurisdiction *is* Berkeley are kept — the portal reports county and state contests
-countywide, and a countywide number on a Berkeley map would be false.
+**The Berkeley map** (`index.html`) uses both. `ingest/build_pending_results.py` keeps the
+precinct rows for any mapped contest that is on Berkeley's ballot and writes
+`precinct_results: "partial"`; those contests then behave exactly like certified ones,
+council-district rollups included. Berkeley is in CD-12, which the county does not map, but
+the Nov 2026 transit measure is countywide and covers all 31 Berkeley precincts — Berkeley
+went **85.6% Yes** against 66.8% countywide. Every other contest on the ballot stays
+citywide-only in a second panel tab, **Latest Berkeley totals**; only contests whose
+jurisdiction *is* Berkeley are kept there, because the portal reports county and state
+contests countywide and a countywide number on a Berkeley map would be false.
+
+With nothing mapped the file keeps `precinct_results: false` and the old behaviour: the
+choropleth is deliberately blank rather than guessing, and the controls are locked.
 
 **The countywide map** (`county.html`) uses both, via
 `ingest/fetch_live_county.py`, which writes a results file in exactly the shape a
@@ -150,8 +161,8 @@ certified build produces so every existing map mode just works:
 * `preliminary: true` and the county's status banner are explicit in the file, so the
   numbers cannot be shown unlabelled;
 * per-precinct registration does not exist in either feed, so it is written as 0 and the
-  turnout mode disables itself. Countywide registration and turnout *do* exist and are
-  recorded as such;
+  turnout mode disables itself on both maps. Countywide registration and turnout *do* exist
+  and are recorded as such;
 * precinct sums are reconciled against the feed's own countywide candidate totals, and
   the outcome is recorded in `status.reconciled`.
 

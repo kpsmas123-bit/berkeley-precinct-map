@@ -57,9 +57,10 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from county_contests import category, included, sort_key  # noqa: E402
+import live_map_feed  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MAP_FEED = "https://electionmaps.alamedacountyca.gov/json/electionResults.json"
+MAP_FEED = live_map_feed.FEED_URL
 PORTAL = "https://alamedacountyca.gov/rovresults/{eid}/"
 UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
@@ -181,51 +182,8 @@ def parse_portal(html):
     return banner, contests
 
 
-# ---- the mapped (precinct-level) races -----------------------------------------
-def parse_map_feed(feed):
-    """-> ({contest_name: {pid: {choice: votes}}}, {contest_name: meta}, reporting)"""
-    cands = feed.get("candidates", {})
-    by_race = {}
-    for key, c in cands.items():
-        by_race.setdefault(str(c["RACE_ID"]), {})[str(key)] = c
-
-    mapped, meta = {}, {}
-    for rid, race in feed.get("races", {}).items():
-        name = str(race.get("description", "")).strip()
-        if not name:
-            continue
-        names = {k: v["name"] for k, v in by_race.get(str(rid), {}).items()}
-        if not names:
-            continue
-        order = sorted(names, key=lambda k: next(
-            (p["candidates"][k]["order"] for p in race["precincts"].values()
-             if k in p.get("candidates", {})), 99))
-        per_precinct = {}
-        for pid, p in race.get("precincts", {}).items():
-            if p.get("noVotesCounted"):
-                continue
-            ch = {names[k]: v["votes"] for k, v in p.get("candidates", {}).items()
-                  if k in names and v.get("votes")}
-            if ch:
-                per_precinct[str(pid)] = ch
-        if not per_precinct:
-            continue
-        clean = re.sub(r"\s*\(RCV\)\s*$", "", name).strip()
-        mapped[clean] = per_precinct
-        meta[clean] = {
-            "rcv": "(RCV)" in name,
-            "kind": "measure" if all(re.fullmatch(r"(bonds\s+)?(yes|no)", n, re.I)
-                                     for n in names.values()) else "candidate",
-            "choices": [names[k] for k in order],
-            "feed_totals": {names[k]: int(v["CAN_VOTES"])
-                            for k, v in by_race.get(str(rid), {}).items() if k in names},
-            "threshold": race.get("percentagePassDisplayMessage", ""),
-        }
-
-    reporting = {str(pid): {"category": v.get("category"),
-                            "pct": as_pct(str(v.get("percentReported", "")))}
-                 for pid, v in feed.get("registrationAndTurnout", {}).items()}
-    return mapped, meta, reporting
+# The precinct-level feed parse lives in live_map_feed.py — the Berkeley build reads
+# the same feed, so there is one parser rather than two that can drift apart.
 
 
 def agg(entries):
@@ -262,8 +220,8 @@ def main():
 
     # ---- feed 1: precinct-level races the county maps live ----------------------
     map_url = opt.get("map-url") or MAP_FEED
-    feed = json.loads(fetch(map_url))
-    mapped, meta, reporting = parse_map_feed(feed)
+    feed = live_map_feed.fetch(map_url)
+    mapped, meta, reporting = live_map_feed.parse(feed)
     if not mapped:
         print(f"ERROR: no precinct-level races in {map_url}", file=sys.stderr)
         sys.exit(1)
@@ -292,12 +250,7 @@ def main():
         banner["map_feed_updated"] = feed["lastUpdatedDateTime"]
 
     # reconcile precinct sums against the feed's own countywide candidate totals
-    recon = {}
-    for n, pr in mapped.items():
-        summed = agg(list({"choices": c} for c in pr.values()))["choices"]
-        want = meta[n].get("feed_totals", {})
-        bad = {c: (summed.get(c, 0), want[c]) for c in want if summed.get(c, 0) != want[c]}
-        recon[n] = {"ok": not bad, "mismatches": bad}
+    recon = live_map_feed.reconcile(mapped, meta)
 
     # ---- assemble, in the shape a certified build produces ---------------------
     contests = {}
