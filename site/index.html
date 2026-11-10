@@ -100,6 +100,8 @@
   #about .ok { margin-top:14px; padding:9px 16px; border-radius:8px; border:none; background:var(--ink); color:#fff; font-size:14px; cursor:pointer; }
   #aboutBtn { position:absolute; top:12px; right:12px; z-index:5; width:30px; height:30px; border-radius:50%; border:1px solid var(--line);
     background:rgba(255,255,255,.96); font-size:15px; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.1); }
+  #countyLink { position:absolute; top:12px; right:50px; z-index:5; font-size:12px; padding:6px 10px; border:1px solid var(--line);
+    border-radius:8px; background:rgba(255,255,255,.96); color:var(--ink); text-decoration:none; box-shadow:0 2px 8px rgba(0,0,0,.1); }
   .ctrlbtn { width:100%; margin-top:6px; padding:6px; font-size:12px; border:1px solid var(--line); background:#fff; border-radius:6px; cursor:pointer; }
   /* mobile / small screens: stack map over a scrollable panel; full-width controls */
   @media (max-width:760px){
@@ -108,6 +110,7 @@
     #controls { left:8px; right:8px; width:auto; max-height:42vh; overflow-y:auto; }
     #legend { max-width:52%; bottom:8px; }
     #aboutBtn { top:10px; right:10px; }
+    #countyLink { top:auto; bottom:8px; right:8px; }
     .modes button, .toggle button, select, .ctrlbtn { min-height:40px; }
     .prec .ph { min-height:40px; }
   }
@@ -122,6 +125,7 @@
 </div></noscript>
 <div id="app">
   <div id="map">
+    <a id="countyLink" href="./county.html" title="Countywide map: statewide offices, Congress and propositions">County map</a>
     <button id="aboutBtn" title="About this map" aria-label="About this map">ⓘ</button>
     <div id="controls">
       <h1>Berkeley Precinct Election Map</h1>
@@ -162,7 +166,7 @@
   <div id="panel"></div>
 </div>
 <div id="about"><div class="box">
-  <h2>Berkeley precinct election results, 2014–2024</h2>
+  <h2>Berkeley precinct election results, 2014–2026</h2>
   <p>Each shape is a <b>voting precinct</b> in Berkeley. Pick an <b>election</b> and a <b>contest</b>, then
   color the map by <b>who won</b>, <b>turnout</b>, or a candidate's <b>share</b>. Click any precinct or
   council district for its full results table.</p>
@@ -173,9 +177,14 @@
     <li>District lines <b>changed in the 2021 redistricting</b>, so "District 1" is a different area before vs. after.</li>
     <li>Older elections had <b>no certified precinct canvass</b>; those totals are shown but marked "not independently reconciled."</li>
     <li>Statewide propositions show <b>only Berkeley's share</b>, not the statewide result.</li>
+    <li>The <b>November 2026</b> election shows <b>citywide totals only</b> — the county does not publish
+        precinct figures until certification, about a month after election day, so there is no precinct
+        pattern to map yet.</li>
+    <li>For statewide offices, Congress and propositions <b>across all of Alameda County</b>, see the
+        <a href="./county.html">county map</a>.</li>
   </ul>
   <p style="font-size:12px;color:#666">Source: Alameda County Registrar of Voters. District lines: City of
-  Berkeley. Basemap © OpenStreetMap contributors, © CARTO. No tracking or cookies.</p>
+  Berkeley. Basemap: Esri, HERE, Garmin, © OpenStreetMap contributors. No tracking or cookies.</p>
   <button class="ok" id="aboutOk">Got it</button>
 </div></div>
 <div id="editor"><div class="box">
@@ -322,8 +331,17 @@ async function boot() {
   map = new maplibregl.Map({
     container: "map",
     style: { version:8,
-      sources:{ carto:{ type:"raster", tiles:["https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png","https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png","https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"], tileSize:256, attribution:"© OpenStreetMap © CARTO" } },
-      layers:[{ id:"base", type:"raster", source:"carto" }] },
+      // Esri's light-gray canvas: keyless, and a neutral ground for a choropleth.
+      // (CARTO's basemaps.cartocdn.com tiles now require an API key and serve a
+      // watermarked placeholder without one.) Labels ride above the fills so place
+      // names stay readable over the choropleth.
+      sources:{
+        esri:{ type:"raster", tileSize:256,
+          tiles:["https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"],
+          attribution:"Esri, HERE, Garmin, © OpenStreetMap contributors" },
+        esriLabels:{ type:"raster", tileSize:256,
+          tiles:["https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}"] } },
+      layers:[{ id:"base", type:"raster", source:"esri" }] },
     center:[-122.29,37.884], zoom:12.4 });
   window._map = map;
   map.on("error", e => console.error("MAP ERROR:", e && e.error && e.error.message));
@@ -348,9 +366,20 @@ function fitToPrecincts(duration){
   state._geo.features.forEach(f=>eachCoord(f.geometry,c=>b.extend(c)));
   if(b.isEmpty()) return;
   const narrow = window.innerWidth<=760;
-  const pad = narrow ? {top:96,left:20,right:20,bottom:40} : {top:110,left:372,right:40,bottom:60};
-  const doFit=()=>{ try{ map.fitBounds(b, { padding:pad, duration: duration==null?400:duration }); }
-    catch(e){ /* container not sized yet — retry after resize */ map.once("idle", ()=>{ try{ map.fitBounds(b,{padding:pad,duration:0}); }catch(_){} }); } };
+  const want = narrow ? {top:96,left:20,right:20,bottom:40} : {top:110,left:372,right:40,bottom:60};
+  const doFit=()=>{
+    // Clamp padding to the canvas — on a narrow desktop window the 372px control
+    // inset can exceed the map pane, and fitBounds then gives up entirely.
+    const c=map.getCanvas();
+    const W=c.clientWidth||c.width, H=c.clientHeight||c.height;
+    const fit=(a,b2,limit)=>{
+      a=Math.min(a, limit*0.35); b2=Math.min(b2, limit*0.35);   // no side eats the pane
+      const t=a+b2, max=limit*0.7;
+      return t<=max? [a,b2] : [a*max/t, b2*max/t]; };
+    const [l,r]=fit(want.left,want.right,W), [t,bm]=fit(want.top,want.bottom,H);
+    const pad={top:Math.round(t),bottom:Math.round(bm),left:Math.round(l),right:Math.round(r)};
+    try{ map.fitBounds(b, { padding:pad, duration: duration==null?400:duration }); }
+    catch(e){ /* container not sized yet — retry after resize */ map.once("idle", ()=>{ try{ map.fitBounds(b,{duration:0}); }catch(_){} }); } };
   // guard against a not-yet-laid-out container (fitBounds → NaN)
   const c=map.getCanvas(); if(c && c.width>0 && c.height>0) doFit(); else map.once("idle", doFit);
 }
@@ -381,6 +410,9 @@ async function loadElection(id) {
     paint:{ "line-color":"#888", "line-width":0.8, "line-dasharray":[2,2], "line-opacity":0.5 } });
   map.addLayer({ id:"districts-focus", type:"line", source:"districts",
     filter:["==",["get","district"], state.district], paint:{ "line-color":"#111", "line-width":2.4 } });
+  // street/place labels on top of the fills
+  if(!map.getLayer("base-labels"))
+    map.addLayer({ id:"base-labels", type:"raster", source:"esriLabels", paint:{ "raster-opacity":0.9 } });
 
   fitToPrecincts(0);
 
@@ -396,10 +428,117 @@ async function loadElection(id) {
     map.on("mouseleave","precincts-fill",()=>map.getCanvas().style.cursor="");
   }
 
+  if (isPending()) { renderPending(); return; }   // canvass not published yet
   buildContestPicker();
   if (!state.contest || !(state.contest in state.catalog)) state.contest = pickDefaultContest();
   if (state.district!=null && !(state.district in state.results.districts)) { state.district = null; state.focus = null; }
   render();
+}
+
+/* ---- elections whose precinct canvass the county has not published yet ----
+   The county releases the precinct-level Statement of Vote only at/near
+   certification (~30 days). Until then we have the real citywide outcome but no
+   precinct pattern, so the choropleth is switched off rather than filled with a
+   guess, and the panel shows the citywide count with its "as of" stamp. */
+const isPending = () => !!(state.results && state.results.precinct_results === false);
+const PENDING_WASH = "#e6ddc7";
+
+function setControlsEnabled(on){
+  document.getElementById("contestSel").disabled = !on;
+  document.querySelectorAll('.modes button[data-mode]').forEach(b=>{ b.disabled = !on; });
+  const mt=document.getElementById("moreToggle"); if(mt) mt.style.display = on? "" : "none";
+  const mv=document.getElementById("moreViews"); if(mv && !on) mv.style.display="none";
+}
+
+function renderPending(){
+  setControlsEnabled(false);
+  const sel=document.getElementById("contestSel");
+  sel.innerHTML=""; sel.add(new Option("— precinct results not published yet —",""));
+  document.getElementById("choiceWrap").style.display="none";
+  document.getElementById("baselineWrap").style.display="none";
+  document.getElementById("rcvNote").style.display="none";
+
+  const paint=()=>{ try{ for(const pid of Object.keys(state.results.precincts))
+      map.setFeatureState({source:"precincts", id:pid},{color:PENDING_WASH, sel:0}); }catch(e){} };
+  if(map.isStyleLoaded() && map.getSource("precincts")) paint(); else map.once("idle", paint);
+  if(map.getLayer("districts-focus")) map.setFilter("districts-focus",["==",["get","district"],"__none__"]);
+
+  document.getElementById("legend").innerHTML =
+    `<div style="font-weight:600;margin-bottom:4px">No precinct pattern yet</div>`
+    + `<div class="row"><span class="sw" style="background:${PENDING_WASH}"></span>awaiting the certified canvass</div>`
+    + `<div style="font-size:11px;color:#595959;margin-top:3px">Citywide totals are in the panel →</div>`;
+
+  document.getElementById("panel").innerHTML = pendingPanelHtml();
+  updateHash();
+}
+
+function needFraction(threshold){          // "Needs 2/3 majority Yes votes to pass"
+  if(!threshold) return null;
+  if(/2\s*\/\s*3|two-?thirds/i.test(threshold)) return 2/3;
+  if(/55%/.test(threshold)) return 0.55;
+  if(/majority/i.test(threshold)) return 0.5;
+  return null;
+}
+
+function pendingPanelHtml(){
+  const cw = state.results.citywide || {};
+  const meta = elections.find(e=>e.id===state.election) || {};
+  const contests = cw.contests || [];
+  const src = (meta.sources||{});
+
+  const yesNo = c => {
+    const y=c.choices.find(r=>/^(bonds\s+)?yes$/i.test(r.choice));
+    const n=c.choices.find(r=>/^(bonds\s+)?no$/i.test(r.choice));
+    if(!y||!n) return null;
+    const share=y.votes/((y.votes+n.votes)||1), need=needFraction(c.threshold);
+    return {y,n,share,need, passing: need==null? null : share>=need};
+  };
+
+  let html = `<div class="dhead"><h2>${esc(meta.name||"November 3, 2026")}</h2>`
+    + `<span class="mem">citywide only</span></div>`
+    + `<div class="vintage">${esc(cw.status||"Preliminary/Unofficial")}`
+    + (cw.county_last_updated? ` · county last updated ${esc(cw.county_last_updated)}` : "")
+    + `</div>`
+    + `<div class="card" style="background:#fff7e6;border-color:#f0d9a8;color:#8a5a00;font-size:12.5px;line-height:1.5">`
+    + `<b>Precinct-level results aren't published yet.</b> Alameda County releases the `
+    + `precinct Statement of Vote at certification, about a month after election day, so there `
+    + `is no precinct pattern to map — the map is deliberately blank rather than guessing. `
+    + `The totals below are the county's running count for Berkeley-only contests.</div>`;
+
+  for(const c of contests){
+    const total = c.total_votes || c.choices.reduce((a,r)=>a+r.votes,0);
+    const m = c.kind==="measure" ? yesNo(c) : null;
+    html += `<div class="prec"><div class="ph" style="cursor:default"><span class="pid">${esc(c.name)}</span>`
+      + `<span class="turn">${(total||0).toLocaleString()} votes</span></div>`;
+    if(c.threshold) html += `<div style="font-size:11px;color:#6b6b6b;margin:2px 0">${esc(c.threshold)}</div>`;
+    if(c.seats) html += `<div style="font-size:11px;color:#8a5a00;margin:2px 0">Multi-seat — top ${c.seats} elected</div>`;
+    if(m && m.passing!==null)
+      html += `<div style="margin:3px 0"><span class="mk ${m.passing?"confident":"flag"}">`
+        + `${m.passing?"passing":"failing"} · needs ${(m.need*100).toFixed(m.need===2/3?1:0)}%</span></div>`;
+    const top = Math.max(...c.choices.map(r=>r.votes));
+    html += `<table class="res">` + c.choices.map((r,i)=>{
+        const win = c.kind==="measure" ? /^(bonds\s+)?yes$/i.test(r.choice) && m && m.passing
+                                       : (c.seats? i < c.seats : r.votes===top);
+        const col = c.kind==="measure"
+          ? (/^(bonds\s+)?yes$/i.test(r.choice)? YESNO.YES : /^(bonds\s+)?no$/i.test(r.choice)? YESNO.NO : CAT[i%CAT.length])
+          : CAT[i%CAT.length];
+        return `<tr class="${win?"win":""}"><td>${esc(r.choice)}`
+          + `<div class="bar"><span style="width:${(r.pct||0).toFixed(1)}%;background:${col}"></span></div></td>`
+          + `<td class="v">${r.votes.toLocaleString()}</td><td class="p">${(r.pct||0).toFixed(1)}%</td></tr>`;
+      }).join("") + `</table>`;
+    if(c.rcv) html += `<div style="font-size:11px;color:#8a5a00;margin-top:3px">Ranked-choice — first-choice votes only.</div>`;
+    html += `</div>`;
+  }
+
+  html += `<div class="credit"><b>${esc(meta.name||"")}</b><br>`
+    + `Citywide totals scraped from the county's live results portal`
+    + (cw.source_url? ` (<a class="src" href="${esc(cw.source_url)}" target="_blank" rel="noopener">results page</a>)` : "")
+    + `. Only Berkeley-jurisdiction contests are shown: the portal reports county and state `
+    + `contests countywide, not for Berkeley, so those would be misleading here.<br>`
+    + (src.election_page? `County <a class="src" href="${esc(src.election_page)}" target="_blank" rel="noopener">election page</a>.<br>`:"")
+    + `Precinct geometry for this election is already published and loaded — only the tallies are missing.`
+    + `</div>`;
+  return html;
 }
 
 function featuredFor(eid){ return (state.featured||[]).filter(f=>f.election===eid).map(f=>f.contest); }
@@ -438,6 +577,8 @@ function colorForContest(){
 }
 
 function render(){
+  if (isPending()) { renderPending(); return; }
+  setControlsEnabled(true);                 // undo the pending-election lockout
   if (state._pendingContestSlug){ const m=Object.keys(state.catalog).find(n=>slug(n)===state._pendingContestSlug); if(m)state.contest=m; state._pendingContestSlug=null; }
   if (state._pendingChoiceSlug){ const m=(state.catalog[state.contest]?.choices||[]).find(c=>slug(c)===state._pendingChoiceSlug); if(m)state.choice=m; state._pendingChoiceSlug=null; }
 
@@ -528,7 +669,21 @@ function buildLegend(cmap){
                    + (anyOver?`<div style="font-size:11px;color:#8a5a00;margin-top:3px">Some precincts exceed 100% (same-day registration; shown at full scale).</div>`:""));
   } else if(state.mode==="choice") el.innerHTML=`<div style="font-weight:600;margin-bottom:4px">% for ${esc(state.choice)}${cat.multi?" (per ballot)":""}</div>`+gradientBar(["0%","","50%","","100%"]);
   else { const seatTxt=cat.multi?`Top vote-getter <span style="color:#8a5a00">· multi-seat${cat.seats?", "+cat.seats+" seats":""}</span>`:`Winner`;
-    el.innerHTML=`<div style="font-weight:600;margin-bottom:4px">${seatTxt}${cat.rcv?" (1st choice)":""}</div>`+cat.choices.map(c=>`<div class="row"><span class="sw" style="background:${cmap[c]}"></span>${esc(c)}</div>`).join("")
+    // Only the choices that actually lead somewhere get a swatch. A statewide
+    // primary can carry 60+ candidates, and listing them all buries the map.
+    const leads={};
+    for(const p of Object.values(state.results.precincts)){
+      const c=p.contests[state.contest]; if(!c) continue;
+      const [w]=winnerOf(c.choices); if(w) leads[w]=(leads[w]||0)+1; }
+    let shown=Object.keys(leads).sort((a,b)=>leads[b]-leads[a]);
+    const LIMIT=8, extra=Math.max(0, shown.length-LIMIT);
+    shown=shown.slice(0,LIMIT);
+    el.innerHTML=`<div style="font-weight:600;margin-bottom:4px">${seatTxt}${cat.rcv?" (1st choice)":""}</div>`
+      + shown.map(c=>`<div class="row"><span class="sw" style="background:${cmap[c]}"></span>${esc(c)}`
+          + `<span style="color:#8a8a84;font-size:11px">· ${leads[c]}</span></div>`).join("")
+      + (extra?`<div style="font-size:11px;color:#595959;margin-top:2px">+${extra} more leading in 1 precinct each</div>`:"")
+      + ((cat.choices||[]).length>shown.length+extra
+          ? `<div style="font-size:11px;color:#595959;margin-top:2px">${(cat.choices||[]).length} candidates on the ballot; only precinct leaders are keyed.</div>` : "")
       + notOnBallotRow()
       + (cat.multi?`<div style="font-size:11px;color:#595959;margin-top:3px">At-large race — color marks the leading vote-getter, not a single winner.</div>`:""); }
 }
@@ -817,6 +972,8 @@ function exportAlignment(){
 }
 
 function updateHash(){
+  // a pending election has no contest/mode state worth linking to
+  if(isPending()){ history.replaceState(null,"","#"+state.election); return; }
   const parts=[state.election, slug(state.contest), state.mode];
   if(state.mode==="choice"||state.mode==="deviation") parts.push(slug(state.choice));
   if(state.mode==="deviation") parts.push("b-"+state.baseline);

@@ -34,6 +34,11 @@ warnings.filterwarnings("ignore")
 
 LABEL_COLS = {"registered voters", "voters cast", "turnout (%)"}
 NOVOTE_CHOICES = {"over votes", "under votes"}
+# Some workbooks carry a per-contest total column alongside the choices (the Nov
+# 2025 special's "Total Votes" is one). Treating it as a choice double-counts every
+# contest it appears in and makes votes-per-ballot look like a vote-for-N race.
+AGGREGATE_COLS = {"total votes", "total vote", "total", "totals", "grand total",
+                  "total ballots", "contest total"}
 NUM_PREFIX = re.compile(r"^\s*\d+\s+")  # strips the "1 " hyperlink prefix
 
 
@@ -133,7 +138,7 @@ def parse_contest_sheet(rows):
         if ci < 5 or h is None or str(h).strip() == "":
             continue
         label = str(h).strip()
-        if is_label(label):
+        if is_label(label) or label.strip().lower() in AGGREGATE_COLS:
             continue
         if label.lower() in NOVOTE_CHOICES:
             novote_cols[ci] = label

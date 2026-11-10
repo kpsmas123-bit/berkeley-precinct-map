@@ -22,7 +22,9 @@ import json, os, sys
 eid, root = sys.argv[1], sys.argv[2]
 m = json.load(open(os.path.join(root, "data/processed/elections.json")))
 e = next(x for x in m["elections"] if x["id"] == eid)
-print(e["district_map"], e["districts_geo"], e.get("format", "xlsx"))
+print(e["district_map"], e["districts_geo"], e.get("format", "xlsx"),
+      "pending" if not e.get("precinct_results", True) else "full",
+      e.get("rov_election_id", "-"), e.get("citywide", "-"))
 PY
 }
 
@@ -30,14 +32,25 @@ build_one() {
   local EID="$1"
   local RAW="$ROOT/data/raw/$EID" RES="$ROOT/data/processed/results/$EID.json" GEO="$ROOT/data/processed/geo/$EID.geojson"
   local IDS="$RAW/berkeley_ids.json"
-  local MAPKEY DGEO FMT
-  read -r MAPKEY DGEO FMT < <(meta_of "$EID") || { echo "  [$EID] not in manifest"; return 1; }
+  local MAPKEY DGEO FMT STATE ROVID CITYREL
+  read -r MAPKEY DGEO FMT STATE ROVID CITYREL < <(meta_of "$EID") || { echo "  [$EID] not in manifest"; return 1; }
   local DMAP="$ROOT/data/district_maps/$MAPKEY.geojson" DGEOP="$ROOT/data/processed/$DGEO"
   local EXT="$FMT"   # xlsx | xls | csv
   local PARSER="parse_canvass.py"; [ "$FMT" = "csv" ] && PARSER="parse_sovc_csv.py"
-  echo "──────── $EID  (map: $MAPKEY, format: $FMT) ────────"
+  echo "──────── $EID  (map: $MAPKEY, format: $FMT, $STATE) ────────"
   bash "$ROOT/ingest/download.sh" "$EID"                                          || { echo "  FAIL download"; return 1; }
   "$PY" "$ROOT/ingest/build_geo.py" "$RAW/precincts.geojson" "$DMAP" "$GEO" "$IDS" || { echo "  FAIL geo"; return 1; }
+  if [ "$STATE" = "pending" ]; then
+    # Precinct canvass not published yet: citywide totals + precinct roster only.
+    local CITY="$ROOT/data/processed/$CITYREL"
+    mkdir -p "$(dirname "$CITY")"
+    "$PY" "$ROOT/ingest/fetch_live_results.py" "$ROVID" "$CITY"                   || { echo "  FAIL live results"; return 1; }
+    "$PY" "$ROOT/ingest/build_pending_results.py" "$EID" "$GEO" "$IDS" "$CITY" "$RES" || { echo "  FAIL pending results"; return 1; }
+    "$PY" "$ROOT/ingest/assign_districts.py" "$RES" "$GEO" "$DMAP" "$MAPKEY"      || { echo "  FAIL assign"; return 1; }
+    "$PY" "$ROOT/ingest/build_districts.py" "$DMAP" "$DGEOP"                      || { echo "  FAIL overlay"; return 1; }
+    echo "  QA skipped (awaiting certified canvass)"
+    return 0
+  fi
   "$PY" "$ROOT/ingest/$PARSER" "$RAW/sov.$EXT" "$EID" "$RES" "$IDS"               || { echo "  FAIL parse"; return 1; }
   "$PY" "$ROOT/ingest/assign_districts.py" "$RES" "$GEO" "$DMAP" "$MAPKEY"        || { echo "  FAIL assign"; return 1; }
   "$PY" "$ROOT/ingest/build_districts.py" "$DMAP" "$DGEOP"                        || { echo "  FAIL overlay"; return 1; }

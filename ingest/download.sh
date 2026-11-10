@@ -17,7 +17,9 @@ eid, root = sys.argv[1], sys.argv[2]
 m = json.load(open(os.path.join(root, "data/processed/elections.json")))
 e = next(x for x in m["elections"] if x["id"] == eid)
 s = e["sources"]
-print(e.get("format", "xlsx"), s["sov"], s.get("district_canvass_xlsx", "-"), s["precincts_geojson"])
+# A pending election (precinct canvass not published yet) has geometry but no SOV.
+sov = s.get("sov", "-") if e.get("precinct_results", True) else "-"
+print(e.get("format", "xlsx"), sov, s.get("district_canvass_xlsx", "-"), s["precincts_geojson"])
 PY
 )
 EXT="$FMT"   # xlsx | xls | csv — the saved sov file extension
@@ -43,7 +45,11 @@ fetch() {  # url dest min_bytes label
 
 echo "downloading $EID -> $RAW"
 rm -f "$RAW/sov.xlsx" "$RAW/sov.xls" "$RAW/sov.csv" "$RAW/district_canvass.xlsx"  # avoid stale from a prior format
-fetch "$SOV" "$RAW/sov.$EXT"             20000 "sov.$EXT"
+if [ "$SOV" != "-" ]; then
+  fetch "$SOV" "$RAW/sov.$EXT"           20000 "sov.$EXT"
+else
+  echo "  (no precinct canvass published yet — geometry only)"
+fi
 fetch "$GEO" "$RAW/precincts.geojson"    10000 "precincts.geojson"
 if [ "$DC" != "-" ]; then
   fetch "$DC" "$RAW/district_canvass.xlsx" 20000 "district_canvass.xlsx"
