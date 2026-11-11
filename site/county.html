@@ -137,6 +137,12 @@
         <button data-mode="turnout" id="turnoutBtn">Turnout</button>
         <button data-mode="choice">% for a choice</button>
         <button data-mode="deviation" title="Where a precinct voted clearly differently from the county">Stands out</button>
+        <button data-mode="partyreg" id="partyregBtn" title="Registered voters by party">Party reg</button>
+        <button data-mode="residual" id="residualBtn" title="Where a choice ran ahead of or behind what the precinct's party registration predicts">vs registration</button>
+      </div>
+      <div id="partyWrap" style="display:none">
+        <label for="partySel">Party</label>
+        <select id="partySel"></select>
       </div>
       <div id="choiceWrap" style="display:none">
         <label for="choiceSel">Candidate / choice</label>
@@ -173,6 +179,20 @@
           precinct (not over ballots cast).</li>
       <li><b>Party presidential primaries</b> are shown per party. Only that party's voters
           received the ballot, so those shares are within-party, not citywide.</li>
+      <li><b>Party registration</b> comes from the <a href="https://statewidedatabase.org/" target="_blank" rel="noopener">California Statewide Database</a>,
+          the only source publishing it by precinct — the Secretary of State stops at county and
+          district level. It is joined to these precincts by id, not by overlapping shapes.
+          Each snapshot is taken for one election; where none exists yet the nearest earlier one
+          is used and the panel says so.</li>
+      <li><b>“vs registration”</b> is the one worth looking at. A plain share map is mostly a map
+          of where the Democrats live; this fits a line through every precinct's Democratic-minus-
+          Republican registration margin and colours what is <i>left over</i> — where a choice ran
+          ahead of or behind what that precinct's registration predicts. The legend reports the
+          fit's R². Like “stands out”, a precinct is only coloured if the gap clears 3 points and
+          its own sampling noise.</li>
+      <li><b>These are precinct patterns, not voter behaviour.</b> A precinct registered 70%
+          Democratic voting 70% for a Democrat tells you nothing about which individuals did what —
+          the classic ecological fallacy. Read it as geography, not as people.</li>
       <li><b>“Stands out”</b> flags precincts whose share differs from the countywide share by
           more than 3 points <i>and</i> beyond normal sampling noise — not merely a big-looking gap.</li>
       <li><b>An election still being counted</b> is marked <i>preliminary</i> and built without a
@@ -242,12 +262,20 @@ const CAT = ["#0072B2","#E69F00","#009E73","#CC79A7","#56B4E9","#D55E00","#F0E44
 const YESNO = { "YES":"#2b8cbe", "NO":"#e08214" };
 const RAMP = ["#f7fbff","#c6dbef","#6baed6","#2171b5","#08306b"];
 const NEUTRAL = "#e8e8e6", NODATA = "#eee";
-const MODES = ["winner","margin","turnout","choice","deviation"];
+const MODES = ["winner","margin","turnout","choice","deviation","partyreg","residual"];
+/* Party registration comes from the California Statewide Database, joined to these
+   precincts by id (see ingest/fetch_registration.py). "npp" is their "dcl",
+   Declined to State — today's No Party Preference. */
+const PARTIES = [["dem","Democratic"],["rep","Republican"],["npp","No Party Preference"],
+                 ["aip","American Independent"],["grn","Green"],["lib","Libertarian"],
+                 ["paf","Peace & Freedom"],["oth","Other parties"]];
+const PARTY_LABEL = Object.fromEntries(PARTIES);
+const RESID_MAX = 0.10;    // ±10 pts saturates the residual scale
 const DEV_MAX = 0.15;      // ±15 pts saturates the diverging scale
 const MATERIAL = 0.03;     // 3-point materiality gate
 const OTHER = "Other candidates";
 
-const state = { election:null, contest:null, mode:"winner", choice:null, tab:"map",
+const state = { election:null, contest:null, mode:"winner", choice:null, tab:"map", party:"dem",
                 city:null, focus:null, results:null, catalog:null, manifest:null, _geo:null };
 const TABS = ["map","latest"];
 let map, elections, citiesGeo;
@@ -335,6 +363,71 @@ function leadingChoice(){ const t=topChoices(); return t[0] || (cat().choices||[
 const isPrelim = () => !!(state.results && state.results.preliminary);
 const prelimStatus = () => (state.results && state.results.status) || {};
 const countyOnly = () => (state.results && state.results.county_only) || [];
+const regMeta = () => (state.results && state.results.registration) || null;
+const REG_KEYS = ["totreg","dem","rep","npp","aip","grn","lib","paf","oth"];
+function regSum(pids){
+  const out=Object.fromEntries(REG_KEYS.map(k=>[k,0]));
+  let any=false;
+  for(const pid of pids){
+    const r=(state.results.precincts[pid]||{}).reg;
+    if(!r) continue;
+    any=true;
+    for(const k of REG_KEYS) out[k]+=r[k]||0;
+  }
+  return any? out : null;
+}
+const cityReg = city => regSum(state.results.cities[city]||[]);
+const countyReg = () => regSum(Object.keys(state.results.precincts));
+function regBars(r, note){
+  if(!r || !r.totreg) return "";
+  const rows=PARTIES.map(([k,label])=>[label, r[k]||0]).filter(([,v])=>v>0)
+    .sort((a,b)=>b[1]-a[1]);
+  const COL={ "Democratic":"#2166ac","Republican":"#b2182b","No Party Preference":"#8a8a84" };
+  return `<table class="res">` + rows.map(([label,v])=>
+      `<tr><td>${esc(label)}<div class="bar"><span style="width:${(100*v/r.totreg).toFixed(1)}%;`
+      + `background:${COL[label]||"#9a9a94"}"></span></div></td>`
+      + `<td class="v">${fmt(v)}</td><td class="p">${fpct(100*v/r.totreg,1)}</td></tr>`).join("")
+    + `</table><div style="font-size:11px;color:#6b6b6b;margin-top:4px">${fmt(r.totreg)} registered`
+    + (note? ` · ${esc(note)}`:"") + `</div>`;
+}
+const hasReg = () => !!(state.results && Object.values(state.results.precincts).some(p=>p.reg));
+const regShare = (p,k) => (p.reg && p.reg.totreg) ? (p.reg[k]||0)/p.reg.totreg : null;
+/* The predictor: Democratic minus Republican registration share. One number, it is
+   what actually separates these precincts, and it keeps the fit explainable — a
+   multi-party model would fit better and mean less. */
+const regMargin = p => (p.reg && p.reg.totreg)
+  ? ((p.reg.dem||0)-(p.reg.rep||0))/p.reg.totreg : null;
+
+/* Least-squares fit of a choice's precinct share on registration margin, so the map
+   can show the RESIDUAL — where a choice ran ahead of or behind what the precinct's
+   registration predicts. That is the question registration makes answerable; a plain
+   share map is mostly a map of where the Democrats live. Cached per contest+choice. */
+let _fitKey=null, _fit=null;
+function regFit(){
+  const key=[state.election,state.contest,state.choice].join("|");
+  if(key===_fitKey) return _fit;
+  _fitKey=key; _fit=null;
+  if(!hasReg() || !state.choice) return null;
+  const xs=[], ys=[];
+  for(const p of Object.values(state.results.precincts)){
+    const e=p.contests[state.contest]; const x=regMargin(p);
+    if(!e || x==null) continue;
+    const n=sumv(e.choices); if(!n) continue;
+    xs.push(x); ys.push((e.choices[state.choice]||0)/n);
+  }
+  const n=xs.length;
+  if(n<20) return null;                       // too few precincts to fit anything
+  const mx=xs.reduce((a,b)=>a+b,0)/n, my=ys.reduce((a,b)=>a+b,0)/n;
+  let sxy=0, sxx=0, syy=0;
+  for(let i=0;i<n;i++){ const dx=xs[i]-mx, dy=ys[i]-my; sxy+=dx*dy; sxx+=dx*dx; syy+=dy*dy; }
+  if(!sxx || !syy) return null;
+  const b=sxy/sxx, a=my-b*mx;
+  _fit={a, b, n, r2:(sxy*sxy)/(sxx*syy)};
+  return _fit;
+}
+const predicted = p => { const f=regFit(), x=regMargin(p);
+  return (f && x!=null) ? f.a + f.b*x : null; };
+
 function hasTurnout(){ const P=state.results.precincts;
   return Object.values(P).some(p=>p.registered>0); }
 const overReg = p => p.registered && p.ballots_cast > p.registered;
@@ -413,14 +506,16 @@ function parseHash(){
   state._pendingChoice = null; state._pendingCity = null; state.tab = "map";
   for(const t of parts.slice(3)){
     if(t.startsWith("c-")) state._pendingChoice = t.slice(2);
+    else if(t.startsWith("p-")) state.party = PARTY_LABEL[t.slice(2)] ? t.slice(2) : "dem";
     else if(t.startsWith("t-")) state.tab = TABS.includes(t.slice(2))? t.slice(2) : "map";
     else state._pendingCity = t;
   }
 }
 function updateHash(){
   const p=[state.election, slug(state.contest||""), state.mode];
-  if((state.mode==="choice"||state.mode==="deviation") && state.choice)
+  if((state.mode==="choice"||state.mode==="deviation"||state.mode==="residual") && state.choice)
     p.push("c-"+bareSlug(state.choice));   // party-free: durable across cycles
+  if(state.mode==="partyreg") p.push("p-"+state.party);
   if(state.tab!=="map" && isPrelim()) p.push("t-"+state.tab);
   if(state.city) p.push(slug(state.city));
   const h="#"+p.join("/");
@@ -622,7 +717,24 @@ function buildContestPicker(){
 /* ---------- render ---------- */
 function render(){
   const c=cat();
-  const usesChoice = state.mode==="choice" || state.mode==="deviation";
+  const usesChoice = state.mode==="choice" || state.mode==="deviation" || state.mode==="residual";
+
+  // Both registration modes need registration; without it they are disabled rather
+  // than silently painting an empty map.
+  const noReg=!hasReg();
+  for(const id of ["partyregBtn","residualBtn"]){
+    const b=document.getElementById(id);
+    if(!b) continue;
+    b.disabled=noReg;
+    b.title=noReg? "No party registration joined for this election" : b.title;
+  }
+  if(noReg && (state.mode==="partyreg"||state.mode==="residual")){ state.mode="winner"; syncModes(); }
+  const pw=document.getElementById("partyWrap");
+  if(pw){
+    pw.style.display = state.mode==="partyreg" ? "block" : "none";
+    if(state.mode==="partyreg") buildPartyPicker();
+  }
+
   document.getElementById("choiceWrap").style.display = usesChoice? "block":"none";
   if(!choiceValid()) state.choice = leadingChoice();
   if(usesChoice) buildChoicePicker();
@@ -667,6 +779,20 @@ function render(){
   updateHash();
 }
 
+function buildPartyPicker(){
+  const sel=document.getElementById("partySel");
+  const r=countyReg()||{};
+  const avail=PARTIES.filter(([k])=>(r[k]||0)>0);
+  const list=avail.length? avail : PARTIES;
+  if(!list.some(([k])=>k===state.party)) state.party=list[0][0];
+  sel.innerHTML="";
+  for(const [k,label] of list){
+    const pctTxt=(r.totreg? ` — ${fpct(100*(r[k]||0)/r.totreg,1)} countywide` : "");
+    sel.add(new Option(label+pctTxt, k));
+  }
+  sel.value=state.party;
+}
+
 function buildChoicePicker(){
   const sel=document.getElementById("choiceSel");
   sel.innerHTML="";
@@ -679,12 +805,45 @@ function buildChoicePicker(){
   sel.value=state.choice;
 }
 
+// Democrats reach 90% of a precinct and Libertarians 3%, so a shared 0-100% ramp
+// would paint every minor party the same colour. Each party gets a scale that fits
+// what it actually reaches countywide.
+function PARTY_SCALE(k){
+  const P=state.results.precincts;
+  let mx=0;
+  for(const p of Object.values(P)){ const v=regShare(p,k); if(v!=null && v>mx) mx=v; }
+  return Math.max(0.05, Math.ceil(mx*20)/20);   // round up to the next 5 points
+}
+
 function paintChoropleth(){
   const P=state.results.precincts, c=cat();
   const setC=(pid,color)=>map.setFeatureState({source:"precincts", id:pid},{color});
   const cmap=colorMap();
   const lump=new Set(topChoices(7));
 
+  if(state.mode==="partyreg"){
+    for(const [pid,p] of Object.entries(P)){
+      const v=regShare(p,state.party);
+      setC(pid, v==null? NODATA : rampColor(v/PARTY_SCALE(state.party)));
+    }
+    return;
+  }
+  if(state.mode==="residual"){
+    const f=regFit();
+    for(const [pid,p] of Object.entries(P)){
+      const e=p.contests[state.contest], yhat=predicted(p);
+      if(!e || yhat==null){ setC(pid,NODATA); continue; }
+      const n=sumv(e.choices);
+      if(!n || !f){ setC(pid,NEUTRAL); continue; }
+      const y=(e.choices[state.choice]||0)/n, r=y-yhat;
+      // same two gates the "stands out" mode uses: a material gap, and one bigger
+      // than this precinct's own sampling noise
+      const se=Math.sqrt(Math.max(y*(1-y),1e-6)/n);
+      setC(pid, (Math.abs(r)>=MATERIAL && Math.abs(r)>1.96*se)
+                  ? divColor(r/RESID_MAX) : NEUTRAL);
+    }
+    return;
+  }
   if(state.mode==="deviation"){
     const ct=countyTotal(state.contest);
     const base={ p: pct(ct.choices[state.choice]||0, sumv(ct.choices))/100, n: sumv(ct.choices) };
@@ -740,6 +899,25 @@ const noDataRow = `<div class="row" style="margin-top:4px"><span class="sw" styl
 
 function buildLegend(){
   const el=document.getElementById("legend"), c=cat();
+  if(state.mode==="partyreg"){
+    const top=PARTY_SCALE(state.party), m=regMeta()||{};
+    el.innerHTML = `<div style="font-weight:600;margin-bottom:4px">Registered ${esc(PARTY_LABEL[state.party]||state.party)}</div>`
+      + gradBar(["0%","",fpct(top*50),"",fpct(top*100)])
+      + `<div style="font-size:11px;color:#595959;margin-top:3px">Share of each precinct's registered voters.`
+      + (m.as_of? ` Registration as of <b>${esc(m.as_of)}</b>.`:"") + `</div>`
+      + noDataRow;
+    return;
+  }
+  if(state.mode==="residual"){
+    const f=regFit();
+    el.innerHTML = `<div style="font-weight:600;margin-bottom:4px">vs registration · ${esc(state.choice||"")}</div>`
+      + divBar(["−10","behind","as predicted","ahead","+10"])
+      + `<div style="font-size:11px;color:#595959;margin-top:3px"><b>Blue</b> = ran ahead of what the precinct's party registration predicts · <b>brown</b> = behind. Grey = close to predicted, or within normal variation.</div>`
+      + (f? `<div style="font-size:11px;color:#595959;margin-top:3px">Fit over ${f.n} precincts, R²&nbsp;=&nbsp;${f.r2.toFixed(2)}.</div>`
+          : `<div style="font-size:11px;color:#8a5a00;margin-top:3px">Not enough precincts with registration to fit this contest.</div>`)
+      + noDataRow;
+    return;
+  }
   if(state.mode==="deviation"){
     el.innerHTML = `<div style="font-weight:600;margin-bottom:4px">vs countywide · ${esc(state.choice)}</div>`
       + divBar(["−15","below","same","above","+15"])
@@ -787,12 +965,24 @@ function resultsTable(choices, cmap, limit){
     + `</table>`;
 }
 
-function metricFor(choices, reg, cast){
+function metricFor(choices, reg, cast, regblock){
   // the number shown next to a city / precinct, matching the active map mode
+  if(state.mode==="partyreg"){
+    const t=regblock && regblock.totreg;
+    return t? {txt:fpct(100*(regblock[state.party]||0)/t), v:(regblock[state.party]||0)/t}
+            : {txt:"—", v:-1};
+  }
   if(state.mode==="turnout") return reg? {txt:fpct(pct(cast,reg)), v:cast/reg} : {txt:"—", v:-1};
   if(!choices || !sumv(choices)) return {txt:"—", v:-1};
   const d=sumv(choices);
   if(state.mode==="margin"){ const m=marginOf(choices); return {txt:(m*100).toFixed(1)+" pts", v:m}; }
+  if(state.mode==="residual"){
+    const f=regFit(), t=regblock && regblock.totreg;
+    if(!f || !t) return {txt:"—", v:-1};
+    const x=((regblock.dem||0)-(regblock.rep||0))/t;
+    const r=(choices[state.choice]||0)/d - (f.a+f.b*x);
+    return {txt:(r>=0?"+":"")+(r*100).toFixed(1)+" pts", v:r};
+  }
   if(state.mode==="choice"||state.mode==="deviation"){
     const p=pct(choices[state.choice]||0,d); return {txt:fpct(p), v:p/100};
   }
@@ -948,19 +1138,41 @@ function contestHeader(c){
     + `</div>`;
 }
 
+/* Registration is a different publisher on a different schedule, so where it came
+   from and how much of the electorate it covers belong on screen, not in a README. */
+function registrationCard(){
+  const m=regMeta(); if(!m) return "";
+  const cov=m.coverage||{}, r=countyReg();
+  const stale = m.is_fallback;
+  return `<div class="card${stale?" note":""}" style="${stale?"":""}">`
+    + `<div class="lbl">Registered voters by party</div>`
+    + regBars(r, cov.registered_pct? `${cov.registered_pct}% of this election's registered voters joined` : "")
+    + `<div style="font-size:11px;${stale?"":"color:#6b6b6b;"}margin-top:6px">`
+    + (stale
+        ? `⚠ No registration snapshot published for this election yet — showing the
+           <b>${esc(m.as_of||"")}</b> one. Registration drifts between elections.`
+        : `Snapshot as of <b>${esc(m.as_of||"")}</b>.`)
+    + ` Source: <a class="src" href="${esc(m.source_url||"https://statewidedatabase.org/")}" target="_blank" rel="noopener">California Statewide Database</a>`
+    + ` · joined by precinct id, ${fmt(cov.precincts_with_registration||0)} of ${fmt(cov.precincts_total||0)} precincts.`
+    + `</div></div>`;
+}
+
 function countyView(c,meta){
   const T=state.results.turnout||{county:{},cities:{}};
   const cities=Object.keys(state.results.cities).sort();
   const rows=cities.map(city=>{
     const ct=cityTotal(state.contest,city);
     const t=(T.cities||{})[city]||{};
-    const m=metricFor(ct&&ct.choices, t.registered, t.ballots_cast);
+    const cr=cityReg(city);
+    const m=metricFor(ct&&ct.choices, t.registered, t.ballots_cast, cr);
     return {city, m, n:(state.results.cities[city]||[]).length,
-            votes: ct? sumv(ct.choices):0, t};
+            votes: ct? sumv(ct.choices):0, t, cr};
   }).sort((a,b)=> b.m.v-a.m.v);
 
   const label = state.mode==="turnout"? "Turnout"
     : state.mode==="margin"? "Margin"
+    : state.mode==="partyreg"? `% ${PARTY_LABEL[state.party]||state.party}`
+    : state.mode==="residual"? `vs registration · ${state.choice}`
     : (state.mode==="choice"||state.mode==="deviation")? `% ${state.choice}`
     : "Leader";
 
@@ -973,6 +1185,7 @@ function countyView(c,meta){
           + `<b style="font-size:15px">${fpct(pct(T.county.ballots_cast,T.county.registered))}</b>`
           + ` <span style="font-size:12px;color:#6b6b6b">${fmt(T.county.ballots_cast)} of ${fmt(T.county.registered)} registered</span></div>`
         : "")
+    + registrationCard()
     + `<div class="lbl" style="margin-top:14px">By jurisdiction · ${esc(label)}</div>`
     + rows.map(r=>
         `<button class="cityrow" data-city="${esc(r.city)}">`
@@ -1016,6 +1229,34 @@ function cityView(c,meta){
     html += `<div class="card note">This contest was not on the ballot in ${esc(state.city)}.</div>`;
   }
 
+  const cr=cityReg(state.city);
+  if(cr) html += `<div class="card"><div class="lbl">${esc(state.city)} · registered by party</div>`
+    + regBars(cr) + `</div>`;
+
+  if(state.mode==="residual" && ct){
+    const f=regFit();
+    html += `<div class="card"><div class="lbl">vs registration · ${esc(state.choice)}</div>`
+      + (f? pids.map(pid=>{
+          const p=state.results.precincts[pid], e=p.contests[state.contest];
+          const yhat=predicted(p);
+          if(!e || yhat==null) return "";
+          const n=sumv(e.choices); if(!n) return "";
+          const y=(e.choices[state.choice]||0)/n, r=y-yhat;
+          const se=Math.sqrt(Math.max(y*(1-y),1e-6)/n);
+          const ok=Math.abs(r)>=MATERIAL && Math.abs(r)>1.96*se;
+          const w=Math.min(50,Math.abs(r)/RESID_MAX*50);
+          return `<div class="dvrow"><div class="top"><span>${esc(pid)}`
+            + `<span style="color:#8a8a84"> · predicted ${fpct(yhat*100,1)}, actual ${fpct(y*100,1)}</span></span>`
+            + `<span class="dev" style="color:${ok?(r>0?"#2166ac":"#b35806"):"#8a8a84"}">`
+            + `${r>0?"+":""}${(r*100).toFixed(1)} pts${ok?"":" (noise)"}</span></div>`
+            + `<div class="dvbar"><div class="z"></div>`
+            + `<div class="seg" style="${r>0?`left:50%`:`right:50%`};width:${w}%;`
+            + `background:${ok?(r>0?"#2166ac":"#b35806"):"#c9c9c4"}"></div></div></div>`;
+        }).join("")
+        : `<div style="font-size:12px;color:#8a5a00">Not enough precincts with registration to fit this contest.</div>`)
+      + `</div>`;
+  }
+
   if(state.mode==="deviation" && ct){
     const base=countyTotal(state.contest);
     const bp=pct(base.choices[state.choice]||0,sumv(base.choices))/100;
@@ -1043,10 +1284,17 @@ function cityView(c,meta){
     const p=state.results.precincts[pid];
     const e=p.contests[state.contest];
     const turn = p.registered? `${fpct(pct(p.ballots_cast,p.registered))} turnout` : "";
+    const r=p.reg;
+    const regLine = (r && r.totreg)
+      ? `<div style="font-size:11px;color:#6b6b6b;margin-top:3px">`
+        + `registered: ${fpct(100*(r.dem||0)/r.totreg,0)} D · ${fpct(100*(r.rep||0)/r.totreg,0)} R · `
+        + `${fpct(100*(r.npp||0)/r.totreg,0)} NPP <span style="color:#9a9a94">(${fmt(r.totreg)})</span></div>`
+      : "";
     return `<div class="prec ${pid===state.focus?"focus":""}" id="prec-${esc(pid)}">`
       + `<button class="ph" data-pid="${esc(pid)}">`
       + `<span class="pid">${esc(pid)}</span>`
       + `<span class="turn">${turn}${overReg(p)?" ⚑":""}</span></button>`
+      + regLine
       + (e? resultsTable(e.choices, cmap, limit)
           : `<div style="font-size:12px;color:#6b6b6b;font-style:italic;margin-top:4px">not on this ballot</div>`)
       + `</div>`;
@@ -1114,6 +1362,8 @@ function wireControls(){
     state.mode=b.dataset.mode; syncModes(); render();
   });
   document.getElementById("choiceSel").onchange = e=>{ state.choice=e.target.value; render(); };
+  const ps=document.getElementById("partySel");
+  if(ps) ps.onchange = e=>{ state.party=e.target.value; render(); };
   document.getElementById("resetView").onclick = ()=>{
     state.city=null; state.focus=null; render(); fitToContest();
   };

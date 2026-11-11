@@ -32,6 +32,7 @@ build_one() {
   local EID="$1"
   local RAW="$ROOT/data/raw/$EID" RES="$ROOT/data/processed/results/$EID.json" GEO="$ROOT/data/processed/geo/$EID.geojson"
   local IDS="$RAW/berkeley_ids.json"
+  local REGF="$ROOT/data/processed/registration/$EID.json"
   local MAPKEY DGEO FMT STATE ROVID CITYREL
   read -r MAPKEY DGEO FMT STATE ROVID CITYREL < <(meta_of "$EID") || { echo "  [$EID] not in manifest"; return 1; }
   local DMAP="$ROOT/data/district_maps/$MAPKEY.geojson" DGEOP="$ROOT/data/processed/$DGEO"
@@ -63,6 +64,10 @@ build_one() {
       "$PY" "$ROOT/ingest/build_pending_results.py" "$EID" "$GEO" "$IDS" "$CITY" "$RES" || { echo "  FAIL pending results"; return 1; }
     fi
     "$PY" "$ROOT/ingest/assign_districts.py" "$RES" "$GEO" "$DMAP" "$MAPKEY"      || { echo "  FAIL assign"; return 1; }
+  "$PY" "$ROOT/ingest/fetch_registration.py" "$EID" "$REGF" \
+    && "$PY" "$ROOT/ingest/attach_registration.py" "$RES" "$REGF" \
+    || echo "  (registration unavailable for $EID — results unchanged)"
+
     "$PY" "$ROOT/ingest/build_districts.py" "$DMAP" "$DGEOP"                      || { echo "  FAIL overlay"; return 1; }
     echo "  QA skipped (awaiting certified canvass)"
     return 0
@@ -78,6 +83,9 @@ build_one() {
 import json,sys; r=json.load(open(sys.argv[1])); r["qa"]="none"; json.dump(r,open(sys.argv[1],"w"),separators=(",",":")); print("  QA skipped (no certified canvass published)")
 PY
   fi
+  "$PY" "$ROOT/ingest/fetch_registration.py" "$EID" "$REGF" \
+    && "$PY" "$ROOT/ingest/attach_registration.py" "$RES" "$REGF" \
+    || echo "  (registration unavailable for $EID — results unchanged)"
   "$PY" "$ROOT/ingest/annotate_contests.py" "$RES" || echo "  (annotate failed)"
   return $rc
 }

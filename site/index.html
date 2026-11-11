@@ -189,6 +189,14 @@
         on that ballot is citywide totals only, in the <b>Latest Berkeley totals</b> tab. Per-precinct
         registration is not published either, so turnout is off for those elections, and every figure is
         superseded by the certified Statement of Vote.</li>
+    <li><b>Party registration</b> per precinct comes from the
+        <a href="https://statewidedatabase.org/" target="_blank" rel="noopener">California Statewide
+        Database</a> — the only source publishing it below county level — joined by precinct id.
+        It is shown as numbers rather than a map: Berkeley is about 74% Democratic and 3%
+        Republican, so a registration choropleth here would be one flat colour. The
+        <a href="./county.html">county map</a> has a <b>“vs registration”</b> mode, which is where
+        that variation actually lives. Registration is a snapshot taken for one election; where
+        none exists for this one yet, the nearest earlier snapshot is shown and labelled.</li>
     <li>For statewide offices, Congress and propositions <b>across all of Alameda County</b>, see the
         <a href="./county.html">county map</a>.</li>
   </ul>
@@ -256,6 +264,44 @@ const MATERIAL = 0.03;         // 3-pt materiality gate
 const NEUTRAL = "#e8e8e6", UNSCORED = "#e6ddc7";
 const OVER_NOTE = "Turnout over 100%: California allows same-day (conditional) voter registration, so ballots cast can exceed the pre-election registered-voter count (precinct consolidation adds to this too).";
 const overReg = p => p.registered && p.ballots_cast > p.registered;
+
+/* Party registration, joined per precinct from the California Statewide Database
+   (see ingest/fetch_registration.py). Berkeley is 74% Democratic and 3% Republican,
+   so there is no useful residual map to draw here — the county map carries the
+   "vs registration" mode, where the variation actually exists. Shown as numbers. */
+const REG_PARTIES = [["dem","Democratic"],["rep","Republican"],["npp","No Party Preference"],
+                     ["aip","American Independent"],["grn","Green"],["lib","Libertarian"],
+                     ["paf","Peace & Freedom"],["oth","Other parties"]];
+const REG_KEYS = ["totreg"].concat(REG_PARTIES.map(x=>x[0]));
+const regMeta = () => (state.results && state.results.registration) || null;
+function regSum(pids){
+  const out=Object.fromEntries(REG_KEYS.map(k=>[k,0]));
+  let any=false;
+  for(const pid of pids){
+    const r=(state.results.precincts[pid]||{}).reg;
+    if(!r) continue;
+    any=true;
+    for(const k of REG_KEYS) out[k]+=r[k]||0;
+  }
+  return any? out : null;
+}
+const REG_COL={dem:"#2166ac", rep:"#b2182b", npp:"#8a8a84"};
+function regCard(pids, label){
+  const r=regSum(pids), m=regMeta();
+  if(!r || !r.totreg) return "";
+  const rows=REG_PARTIES.map(([k,l])=>[k,l,r[k]||0]).filter(x=>x[2]>0).sort((a,b)=>b[2]-a[2]);
+  return `<div class="card"><div class="lbl">${esc(label)} · registered by party</div>`
+    + `<table class="res">` + rows.map(([k,l,v])=>
+        `<tr><td>${esc(l)}<div class="bar"><span style="width:${(100*v/r.totreg).toFixed(1)}%;`
+        + `background:${REG_COL[k]||"#9a9a94"}"></span></div></td>`
+        + `<td class="v">${v.toLocaleString()}</td>`
+        + `<td class="p">${(100*v/r.totreg).toFixed(1)}%</td></tr>`).join("")
+    + `</table><div style="font-size:11px;color:var(--muted);margin-top:4px">`
+    + `${r.totreg.toLocaleString()} registered`
+    + (m && m.as_of? ` · snapshot ${esc(m.as_of)}${m.is_fallback?" (no snapshot for this election yet)":""}`:"")
+    + (m && m.source_url? ` · <a class="src" href="${esc(m.source_url)}" target="_blank" rel="noopener">Statewide Database</a>`:"")
+    + `</div></div>`;
+}
 
 const state = { election:null, contest:null, mode:"winner", choice:null, baseline:"district",
                 district:null, focus:null, results:null, catalog:null, dmembers:{},
@@ -1016,6 +1062,7 @@ function showCitywide(){
   } else html+=`<div class="noballot">“${esc(state.contest)}” had no votes in Berkeley precincts.</div>`;
   // per-district breakdown (clickable)
   const dists=Object.keys(state.results.districts).sort((a,b)=>(+a)-(+b));
+  html+=regCard(Object.keys(P), "Berkeley");
   html+=`<div class="subtotal-lbl" style="text-transform:uppercase;font-size:11px;letter-spacing:.5px;color:var(--muted);margin:2px 0 2px">By council district — click to drill in</div>`;
   dists.forEach(d=>{
     const pids=state.results.districts[d]||[]; const agg={};
@@ -1059,6 +1106,8 @@ function showDistrict(){
       + resultsTable(sub,cmap,win)+`</div>`;
   } else html+=`<div class="noballot">“${esc(state.contest)}” was not on the ballot in District ${esc(d)}.</div>`;
 
+  html+=regCard(pids, `District ${d}`);
+
   // per-precinct breakdown
   let anyOver=false;
   pids.forEach(pid=>{ const p=state.results.precincts[pid], c=p.contests[state.contest];
@@ -1071,7 +1120,14 @@ function showDistrict(){
       + (p.registered
           ? `<span class="turn"${over?` title="${esc(OVER_NOTE)}"`:""}>turnout ${tpct}%${over?` <span style="color:#8a5a00">†</span>`:""} · ${(p.ballots_cast||0).toLocaleString()}/${(p.registered||0).toLocaleString()}</span>`
           : `<span class="turn">${c? sumv(c.choices).toLocaleString()+" votes" : ""}</span>`)
-      + `</button>`;
+      + `</button>`
+      + (p.reg && p.reg.totreg
+          ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">registered: `
+            + `${(100*(p.reg.dem||0)/p.reg.totreg).toFixed(0)}% D · `
+            + `${(100*(p.reg.rep||0)/p.reg.totreg).toFixed(0)}% R · `
+            + `${(100*(p.reg.npp||0)/p.reg.totreg).toFixed(0)}% NPP `
+            + `<span style="color:#9a9a94">(${p.reg.totreg.toLocaleString()})</span></div>`
+          : "");
     if(c){ const [win]=winnerOf(c.choices); html+=resultsTable(c.choices,cmap,win); }
     else html+=`<div class="noballot">not on this precinct’s ballot</div>`;
     html+=`</div>`;

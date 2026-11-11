@@ -69,6 +69,7 @@ build_one() {
   local RAW="$ROOT/data/raw/$EID"
   local GEO="$CDIR/geo/$EID.geojson" IDS="$CDIR/ids/$EID.json"
   local TMP="$CDIR/tmp/$EID.full.json" OUT="$CDIR/results/$EID.json"
+  local REGF="$ROOT/data/processed/registration/$EID.json"
   local FMT DATE NAME
   read -r FMT DATE NAME < <(meta_of "$EID") || { echo "  [$EID] not in manifest"; return 1; }
   local PARSER="parse_canvass.py"; [ "$FMT" = "csv" ] && PARSER="parse_sovc_csv.py"
@@ -83,6 +84,12 @@ build_one() {
   "$PY" "$ROOT/ingest/filter_county_results.py" "$TMP" "$GEO" "$OUT" \
         || { echo "  FAIL filter"; return 1; }
   rm -f "$TMP"
+
+  # Party registration is a separate publisher on a separate schedule, so it is
+  # fetched and merged after the tallies rather than inside a parser.
+  "$PY" "$ROOT/ingest/fetch_registration.py" "$EID" "$REGF" \
+    && "$PY" "$ROOT/ingest/attach_registration.py" "$OUT" "$REGF" \
+    || echo "  (registration unavailable for $EID — results unchanged)"
   return 0
 }
 
@@ -94,6 +101,7 @@ build_preliminary() {
   local EID="$1" ROVID="$2"
   local RAW="$ROOT/data/raw/$EID"
   local GEO="$CDIR/geo/$EID.geojson" IDS="$CDIR/ids/$EID.json" OUT="$CDIR/results/$EID.json"
+  local REGF="$ROOT/data/processed/registration/$EID.json"
 
   # A Cast Vote Record export, if one has been obtained, beats the live map feed by
   # a mile: one record per ballot, every contest, with the precinct on it. Drop it at
@@ -123,6 +131,13 @@ build_preliminary() {
     "$PY" "$ROOT/ingest/fetch_live_county.py" "$EID" "$GEO" "$OUT" --rov-id="$ROVID" \
           || { echo "  FAIL live county results"; return 1; }
   fi
+
+  # Party registration is a separate publisher on a separate schedule, so it is
+  # fetched and merged after the tallies rather than inside a parser.
+  "$PY" "$ROOT/ingest/fetch_registration.py" "$EID" "$REGF" \
+    && "$PY" "$ROOT/ingest/attach_registration.py" "$OUT" "$REGF" \
+    || echo "  (registration unavailable for $EID — results unchanged)"
+
   return 0
 }
 
