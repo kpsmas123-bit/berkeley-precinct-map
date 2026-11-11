@@ -12,7 +12,7 @@
     background:none; border:none; border-bottom:2px solid transparent; color:var(--muted, #6b6b6b); }
   .tabs button.active { color:inherit; font-weight:600; border-bottom-color:currentColor; }
   .tabs button:focus-visible { outline:2px solid #2166ac; outline-offset:-2px; }
-  :root { --panel: 372px; --bg: #f7f7f5; --ink: #1a1a1a; --muted: #6b6b6b; --line: #e2e2dd; --gold:#e8a400;
+  :root { --peek: 112px; --panel: 372px; --bg: #f7f7f5; --ink: #1a1a1a; --muted: #6b6b6b; --line: #e2e2dd; --gold:#e8a400;
     --below:#b35806; --above:#2166ac; --neutral:#e8e8e6; }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); }
@@ -108,18 +108,103 @@
   #countyLink { position:absolute; top:12px; right:50px; z-index:5; font-size:12px; padding:6px 10px; border:1px solid var(--line);
     border-radius:8px; background:rgba(255,255,255,.96); color:var(--ink); text-decoration:none; box-shadow:0 2px 8px rgba(0,0,0,.1); }
   .ctrlbtn { width:100%; margin-top:6px; padding:6px; font-size:12px; border:1px solid var(--line); background:#fff; border-radius:6px; cursor:pointer; }
-  /* mobile / small screens: stack map over a scrollable panel; full-width controls */
+/* ---------- desktop-neutral scaffolding for the mobile sheet ---------- */
+  #sheet { display:contents; }
+  #sheetGrip, #mbar, #ctlBackdrop, #ctlDone { display:none; }
+
+  /* =========================================================================
+     Phones. The old layout floated a 341px control card over a 455px map and
+     put the legend on top of that, leaving about 60px of visible map. Here the
+     map is full-bleed, the controls live in a sheet opened from a slim top bar,
+     and the results panel is a drag-up bottom sheet that never covers the map
+     completely. svh, not vh: legacy vh is measured against the collapsed
+     toolbar, so a vh-sized layout overflows on load in mobile Safari.
+     ========================================================================= */
   @media (max-width:760px){
-    #app { grid-template-columns:1fr; grid-template-rows: 56vh auto; }
-    #panel { border-left:none; border-top:1px solid var(--line); }
-    #controls { left:8px; right:8px; width:auto; max-height:42vh; overflow-y:auto; }
-    #legend { max-width:52%; bottom:8px; }
-    #aboutBtn { top:10px; right:10px; }
-    #countyLink { top:auto; bottom:8px; right:8px; }
-    .modes button, .toggle button, select, .ctrlbtn { min-height:40px; }
-    .prec .ph { min-height:40px; }
+    html, body { height:100%; overflow:hidden; overscroll-behavior:none; }
+    #app { display:block; position:relative; height:100vh; height:100svh; }
+    #map { position:absolute; inset:0; }
+
+    /* --- top bar --------------------------------------------------------- */
+    #mbar { display:flex; gap:6px; align-items:stretch; position:absolute; z-index:7;
+      top:0; left:0; right:0; padding:6px 8px; background:rgba(255,255,255,.97);
+      border-bottom:1px solid var(--line); box-shadow:0 1px 6px rgba(0,0,0,.06); }
+    #mbar button { flex:1 1 0; min-height:44px; min-width:44px; text-align:left;
+      background:#fff; border:1px solid var(--line); border-radius:9px; padding:4px 8px;
+      font:inherit; color:var(--ink); overflow:hidden; cursor:pointer; }
+    #mbar #mbarInfo { flex:0 0 44px; text-align:center; font-size:16px; }
+    #mbar .k { display:block; font-size:9.5px; text-transform:uppercase; letter-spacing:.5px;
+      color:var(--muted); line-height:1.3; }
+    #mbar .v { display:block; font-size:12.5px; font-weight:600; line-height:1.3;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+    #nav { top:auto; bottom:calc(var(--peek) + 10px); right:8px; z-index:6; }
+    .maplibregl-ctrl-bottom-right { bottom:calc(var(--peek) + 58px); }
+    #nav a, #nav button { min-height:44px; display:flex; align-items:center; }
+    #nav #aboutBtn { display:none; }      /* lives in the top bar on a phone */
+
+    /* --- controls, as a sheet opened from the top bar -------------------- */
+    #ctlBackdrop { display:block; position:fixed; inset:0; z-index:19;
+      background:rgba(0,0,0,.35); opacity:0; pointer-events:none; transition:opacity .2s; }
+    body.ctl-open #ctlBackdrop { opacity:1; pointer-events:auto; }
+    #controls { position:fixed; z-index:20; top:auto; left:0; right:0; bottom:0; width:auto;
+      max-height:78svh; overflow-y:auto; border-radius:14px 14px 0 0;
+      border:1px solid var(--line); border-bottom:none; padding:14px 16px calc(16px + env(safe-area-inset-bottom));
+      transform:translateY(103%); transition:transform .22s ease;
+      box-shadow:0 -6px 28px rgba(0,0,0,.18); }
+    body.ctl-open #controls { transform:none; }
+    #controls h1, #controls .sub { display:none; }
+    #ctlDone { display:block; order:-1; margin:0 0 10px; min-height:44px; font-size:14px;
+      background:var(--ink); color:#fff; border-color:var(--ink); }
+    .modes { flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch;
+      scrollbar-width:none; padding-bottom:2px; }
+    .modes::-webkit-scrollbar { display:none; }
+    .modes button { flex:0 0 auto; min-height:44px; padding:6px 12px; }
+    select, .ctrlbtn { min-height:44px; font-size:15px; }   /* 15px: iOS zooms below 16 on focus… */
+    #controls select { font-size:16px; }                    /* …so the real inputs get 16 */
+
+    /* --- legend: one line until tapped ----------------------------------- */
+    #legend { bottom:calc(var(--peek) + 10px); left:8px; max-width:62%; z-index:6;
+      max-height:34px; overflow:hidden; padding:8px 10px; cursor:pointer; }
+    #legend.open { max-height:46svh; overflow-y:auto; }
+    #legend::after { content:"▾"; position:absolute; right:8px; top:7px; color:var(--muted); font-size:11px; }
+    #legend.open::after { content:"▴"; }
+
+    /* --- the results sheet ------------------------------------------------ */
+    #sheet { display:block; position:fixed; z-index:10; left:0; right:0; bottom:0;
+      height:82svh; background:#fff; border-radius:14px 14px 0 0;
+      box-shadow:0 -6px 28px rgba(0,0,0,.16); border:1px solid var(--line); border-bottom:none;
+      transform:translateY(calc(82svh - var(--peek)));
+      transition:transform .24s cubic-bezier(.25,.8,.3,1); touch-action:none; }
+    body.sheet-half #sheet { transform:translateY(42svh); }
+    body.sheet-full #sheet { transform:translateY(0); }
+    body.sheet-drag #sheet { transition:none; }
+    #sheetGrip { display:block; width:100%; background:none; border:none; padding:9px 14px 6px;
+      cursor:grab; text-align:left; font:inherit; touch-action:none; }
+    #sheetGrip .bar { display:block; width:40px; height:4px; border-radius:2px;
+      background:#cfcfc9; margin:0 auto 7px; }
+    #sheetGrip .lbl { display:block; font-size:12.5px; color:var(--muted);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    #sheetGrip .lbl b { color:var(--ink); }
+    #panel { position:static; height:calc(82svh - 52px); overflow-y:auto;
+      -webkit-overflow-scrolling:touch; border:none; padding:0 16px calc(28px + env(safe-area-inset-bottom)); }
+    body.sheet-peek #panel { overflow:hidden; }   /* no scrolling a sheet you cannot see */
+
+    .prec .ph, .cityrow, .tabs button { min-height:44px; }
+    #about .box { max-height:84svh; }
   }
-  @media (max-width:400px){ #controls { font-size:12px; } #legend { max-width:60%; } }
+  @media (max-width:380px){
+    #mbar .v { font-size:12px; }
+  }
+  @media (max-width:760px){
+    /* Berkeley-only chrome */
+    #countyLink { top:auto; bottom:calc(var(--peek) + 10px); right:8px; z-index:6;
+      min-height:44px; display:flex; align-items:center; max-width:46%;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    #aboutBtn { display:none; }
+    #controls h1, #controls .sub, #controls #focusNote { display:none; }
+    .toggle button, .morebtn, #moreToggle { min-height:44px; }
+  }
 </style>
 </head>
 <body>
@@ -130,6 +215,12 @@
 </div></noscript>
 <div id="app">
   <div id="map">
+    <!-- phone-only top bar; the floating control card covered 75% of the map -->
+    <div id="mbar">
+      <button id="mbarContest" type="button"><span class="k">Contest</span><span class="v">…</span></button>
+      <button id="mbarMode" type="button"><span class="k">Mode</span><span class="v">…</span></button>
+      <button id="mbarInfo" type="button" aria-label="About this map">ⓘ</button>
+    </div>
     <a id="countyLink" href="./county.html" title="Countywide map: statewide offices, Congress and propositions">County map</a>
     <button id="aboutBtn" title="About this map" aria-label="About this map">ⓘ</button>
     <div id="controls">
@@ -162,6 +253,7 @@
         </div>
       </div>
       <div id="rcvNote">⚑ Ranked-choice contest — this shows <b>first-choice votes only</b>.</div>
+      <button class="ctrlbtn" id="ctlDone">Done</button>
       <button class="ctrlbtn" id="resetView">⤢ Reset map view</button>
       <button class="ctrlbtn" id="shareBtn">🔗 Copy link to this map</button>
       <!-- Authoring tool — hidden in the public build; remove display:none to score contests locally. -->
@@ -169,8 +261,17 @@
     </div>
     <div id="legend"></div>
   </div>
-  <div id="panel"></div>
+  <!-- On a phone the panel becomes a drag-up bottom sheet over a full-bleed map.
+       #sheet is display:contents on desktop, so the grid still sees #panel as its
+       own child and the desktop layout is untouched. -->
+  <div id="sheet">
+    <button id="sheetGrip" type="button" aria-label="Expand results" aria-expanded="false">
+      <span class="bar"></span><span class="lbl"></span>
+    </button>
+    <div id="panel"></div>
+  </div>
 </div>
+<div id="ctlBackdrop"></div>
 <div id="about"><div class="box">
   <h2>Berkeley precinct election results, 2014–2026</h2>
   <p>Each shape is a <b>voting precinct</b> in Berkeley. Pick an <b>election</b> and a <b>contest</b>, then
@@ -443,7 +544,9 @@ async function boot() {
     if(inited) return; inited=true;
     try { parseHash(); document.getElementById("electionSel").value = state.election;
       await loadElection(state.election); wireControls(); window._ready = true;
-      try { if(!localStorage.getItem("bpm_about_v1")){ document.getElementById("about").style.display="flex"; localStorage.setItem("bpm_about_v1","1"); } } catch(e){} }
+      // not on a phone: a full-screen page of bullets before you have seen the map
+      // is not an introduction. The ⓘ in the top bar opens it on demand.
+      try { if(!isPhone() && !localStorage.getItem("bpm_about_v1")){ document.getElementById("about").style.display="flex"; localStorage.setItem("bpm_about_v1","1"); } } catch(e){} }
     catch (err) { console.error("LOAD HANDLER FAILED:", err && err.stack || err); fatal("Something went wrong loading the map. Please refresh."); }
   }
   map.on("load", init);
@@ -480,7 +583,9 @@ function fitToPrecincts(duration){
   state._geo.features.forEach(f=>eachCoord(f.geometry,c=>b.extend(c)));
   if(b.isEmpty()) return;
   const narrow = window.innerWidth<=760;
-  const want = narrow ? {top:96,left:20,right:20,bottom:40} : {top:110,left:372,right:40,bottom:60};
+  // on a phone the visible band is between the top bar and the sheet's peek edge
+  const want = narrow ? {top:70,left:18,right:18,bottom:130}
+                      : {top:110,left:372,right:40,bottom:60};
   const doFit=()=>{
     // Clamp padding to the canvas — on a narrow desktop window the 372px control
     // inset can exceed the map pane, and fitBounds then gives up entirely.
@@ -773,6 +878,7 @@ function render(){
   if(map.isStyleLoaded() && map.getSource("precincts")) paintMap();
   else map.once("idle", paintMap);   // repaint once the style/tiles settle (resilient to flaky CDNs)
   buildLegend(colorForContest());
+  if(isPhone()){ syncTopBar(); syncSheetLabel(); }
   if(isPartial() && state.tab==="latest"){
     const panel=document.getElementById("panel");
     panel.innerHTML = pendingPanelHtml(true);
@@ -1152,6 +1258,120 @@ function precinctCenter(pid){
 }
 
 function syncBaselineButtons(){ document.querySelectorAll('#baselineToggle button').forEach(b=>b.classList.toggle("active", b.dataset.base===state.baseline)); }
+/* ================= phone layout =========================================
+   The map is full-bleed and the results panel is a bottom sheet with three
+   snap points, the pattern Google Maps uses and NN/G describes: non-modal,
+   so the map stays live behind it, and never full height so it still reads
+   as a sheet. The controls open as a separate sheet from the top bar, and
+   only one sheet is ever open at a time.
+   ====================================================================== */
+const isPhone = () => matchMedia("(max-width:760px)").matches;
+const SNAPS = ["peek","half","full"];
+let sheetSnap = "peek";
+
+function setSnap(sn){
+  sheetSnap = SNAPS.includes(sn)? sn : "peek";
+  const b=document.body;
+  b.classList.remove("sheet-peek","sheet-half","sheet-full");
+  b.classList.add("sheet-"+sheetSnap);
+  const g=document.getElementById("sheetGrip");
+  if(g) g.setAttribute("aria-expanded", String(sheetSnap!=="peek"));
+  if(sheetSnap==="peek") document.getElementById("panel").scrollTop=0;
+}
+
+/* The peek strip has to earn its 112px: it carries the answer, so the map is
+   readable without opening anything. */
+function syncSheetLabel(){
+  const g=document.getElementById("sheetGrip");
+  if(!g || !isPhone() || !state.results || !state.catalog || !state.contest) return;
+  const lbl=g.querySelector(".lbl");
+  let txt="";
+  try {
+    if(state.focus) txt=`Precinct ${state.focus}`;
+    else if(state.district) txt=`District ${state.district}`;
+    else {
+      const agg=aggregate2(state.contest), tot=sumv(agg);
+      if(tot){ const [w,v]=winnerOf(agg);
+        txt=`<b>${esc(w)} ${(100*v/tot).toFixed(1)}%</b> · ${tot.toLocaleString()} votes`; }
+    }
+  } catch(e){}
+  lbl.innerHTML = txt || "Results";
+}
+
+function syncTopBar(){
+  if(!isPhone()) return;
+  const c=document.getElementById("mbarContest"), m=document.getElementById("mbarMode");
+  if(c) c.querySelector(".v").textContent = state.contest || "—";
+  if(m){
+    const btn=document.querySelector(`.modes button[data-mode="${state.mode}"]`);
+    let v=btn? btn.textContent.trim() : state.mode;
+    if(state.choice && (state.mode==="choice"||state.mode==="deviation"))
+      v += " · "+String(state.choice).replace(/^[A-Z]{2,4}\s*-\s*/,"");
+    m.querySelector(".v").textContent = v;
+  }
+}
+
+const openControls = on => document.body.classList.toggle("ctl-open", !!on);
+
+function wirePhoneUI(){
+  const grip=document.getElementById("sheetGrip");
+  const sheet=document.getElementById("sheet");
+  setSnap("peek");
+
+  // tap cycles up, and back to peek from the top
+  let dragged=false;
+  grip.addEventListener("click", ()=>{
+    if(dragged){ dragged=false; return; }
+    setSnap(sheetSnap==="peek"? "half" : sheetSnap==="half"? "full" : "peek");
+  });
+
+  // drag: follow the finger, then snap to whichever point is nearest
+  let startY=0, startTop=0, moved=0, dragging=false;
+  const topFor = sn => sn==="full"? 0 : sn==="half"? window.innerHeight*0.42
+                                      : sheet.offsetHeight - parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--peek"));
+  grip.addEventListener("pointerdown", e=>{
+    if(!isPhone()) return;
+    dragging=true; moved=0; startY=e.clientY; startTop=topFor(sheetSnap);
+    document.body.classList.add("sheet-drag");
+    grip.setPointerCapture(e.pointerId);
+  });
+  grip.addEventListener("pointermove", e=>{
+    if(!dragging) return;
+    moved=e.clientY-startY;
+    const max=topFor("peek");
+    sheet.style.transform=`translateY(${Math.max(0,Math.min(max,startTop+moved))}px)`;
+  });
+  const end=()=>{
+    if(!dragging) return;
+    dragging=false; document.body.classList.remove("sheet-drag");
+    sheet.style.transform="";
+    if(Math.abs(moved)>8){
+      dragged=true;
+      const now=Math.max(0,Math.min(topFor("peek"), startTop+moved));
+      let best=SNAPS[0], bd=Infinity;
+      for(const sn of SNAPS){ const d=Math.abs(topFor(sn)-now); if(d<bd){ bd=d; best=sn; } }
+      setSnap(best);
+      setTimeout(()=>{ dragged=false; }, 60);
+    }
+  };
+  grip.addEventListener("pointerup", end);
+  grip.addEventListener("pointercancel", end);
+
+  // top bar -> controls sheet
+  const open=()=>{ openControls(true); setSnap("peek"); };
+  document.getElementById("mbarContest").onclick = open;
+  document.getElementById("mbarMode").onclick = open;
+  document.getElementById("mbarInfo").onclick = ()=>{ document.getElementById("about").style.display="flex"; };
+  document.getElementById("ctlDone").onclick = ()=> openControls(false);
+  document.getElementById("ctlBackdrop").onclick = ()=> openControls(false);
+
+  // legend collapses to one line until tapped
+  const lg=document.getElementById("legend");
+  lg.addEventListener("click", ()=>{ if(isPhone()) lg.classList.toggle("open"); });
+
+  document.addEventListener("keydown", e=>{ if(e.key==="Escape") openControls(false); });
+}
+
 function syncModeButtons(){
   document.querySelectorAll(".modes button").forEach(b=>b.classList.toggle("active", b.dataset.mode===state.mode));
   if(state.mode==="choice") document.getElementById("moreViews").style.display="flex";
@@ -1180,6 +1400,7 @@ function wireControls(){
       catch(_){ done(false); }
     }
   };
+  wirePhoneUI();
   const about=document.getElementById("about");
   document.getElementById("aboutBtn").onclick=()=>about.style.display="flex";
   document.getElementById("aboutOk").onclick=()=>about.style.display="none";
