@@ -13,17 +13,27 @@ done
 
 # countywide map data (built separately by ./build_county.sh)
 if [ -d "$ROOT/data/processed/county" ]; then
-  mkdir -p "$ROOT/site/data/county/results" "$ROOT/site/data/county/geo"
+  mkdir -p "$ROOT/site/data/county/geo"
   for f in elections.json cities.geojson; do
     [ -f "$ROOT/data/processed/county/$f" ] && cp "$ROOT/data/processed/county/$f" "$ROOT/site/data/county/$f"
   done
-  if compgen -G "$ROOT/data/processed/county/results/*.json" > /dev/null; then
-    cp "$ROOT/data/processed/county/results/"*.json "$ROOT/site/data/county/results/"
-  fi
   if [ -d "$ROOT/data/processed/county/split" ]; then
     rm -rf "$ROOT/site/data/county/split"
     cp -R "$ROOT/data/processed/county/split" "$ROOT/site/data/county/split"
   fi
+  # Single-file results are the pre-split format. Stage one only where no split
+  # exists, so the two formats never ship the same election twice.
+  for f in "$ROOT/data/processed/county/results/"*.json; do
+    [ -e "$f" ] || continue
+    eid="$(basename "$f" .json)"
+    if [ ! -d "$ROOT/data/processed/county/split/$eid" ]; then
+      mkdir -p "$ROOT/site/data/county/results"
+      cp "$f" "$ROOT/site/data/county/results/$eid.json"
+    else
+      rm -f "$ROOT/site/data/county/results/$eid.json"
+    fi
+  done
+  rmdir "$ROOT/site/data/county/results" 2>/dev/null || true
   if compgen -G "$ROOT/data/processed/county/geo/*.geojson" > /dev/null; then
     cp "$ROOT/data/processed/county/geo/"*.geojson "$ROOT/site/data/county/geo/"
   fi
