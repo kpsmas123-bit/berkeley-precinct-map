@@ -45,7 +45,9 @@ def main():
             "id": e["id"],
             "date": e["date"],
             "name": e["name"],
-            "results": f"results/{e['id']}.json",
+            "results": (f"split/{e['id']}/summary.json"
+                        if os.path.isdir(os.path.join(CDIR, "split", e["id"]))
+                        else f"results/{e['id']}.json"),
             "geo": f"geo/{e['id']}.geojson",
             "n_precincts": len(r["precincts"]),
             "n_contests": len(contests),

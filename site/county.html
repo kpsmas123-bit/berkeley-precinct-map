@@ -458,6 +458,54 @@ function leadingChoice(){ const t=topChoices(); return t[0] || (cat().choices||[
 const isPrelim = () => !!(state.results && state.results.preliminary);
 const prelimStatus = () => (state.results && state.results.status) || {};
 const countyOnly = () => (state.results && state.results.county_only) || [];
+/* ---- lazy data ------------------------------------------------------------
+   The map draws one contest at a time, so results are split per contest on the
+   server and fetched as they are picked (ingest/split_results.py). Per-precinct
+   party registration is split off too: it is over half the summary's weight and
+   only the two registration modes read it. First paint for Nov 2026 goes from
+   110 KB to about 16 KB gzipped. Older single-file elections still load whole,
+   so nothing has to be rebuilt in lockstep. */
+async function ensureContest(name){
+  const r=state.results;
+  if(!r || !r.contest_files || !name) return;
+  r._loaded = r._loaded || new Set();
+  if(r._loaded.has(name)) return;
+  const rel=r.contest_files[name];
+  if(!rel) return;
+  try {
+    const d=await (await fetch(`${DATA}/${r._base}/${rel}`)).json();
+    for(const [pid,e] of Object.entries(d.precincts||{})){
+      const p=r.precincts[pid];
+      if(p) (p.contests || (p.contests={}))[name]=e;
+    }
+    r._loaded.add(name);
+  } catch(err){ console.error("contest fetch failed:", name, err && err.message); }
+}
+async function ensureRegistration(){
+  const r=state.results;
+  if(!r || !r.registration_file || r._regLoaded) return;
+  try {
+    const d=await (await fetch(`${DATA}/${r._base}/${r.registration_file}`)).json();
+    for(const [pid,reg] of Object.entries(d.precincts||{})){
+      if(r.precincts[pid]) r.precincts[pid].reg=reg;
+    }
+    r._regLoaded=true;
+    _fitKey=null;                       // the fit depends on registration
+  } catch(err){ console.error("registration fetch failed:", err && err.message); }
+}
+
+/* Changing contest may need a fetch, so every path that sets one goes through
+   here rather than assigning state.contest directly. */
+async function setContest(name, opts){
+  if(!name || !(name in (state.catalog||{}))) return;
+  state.contest=name; state.choice=null; state.focus=null;
+  await ensureContest(name);
+  const sel=document.getElementById("contestSel");
+  if(sel) sel.value=name;
+  render();
+  if(opts && opts.fit) fitToContest();
+}
+
 const regMeta = () => (state.results && state.results.registration) || null;
 const REG_KEYS = ["totreg","dem","rep","npp","aip","grn","lib","paf","oth"];
 function regSum(pids){
@@ -485,7 +533,8 @@ function regBars(r, note){
     + `</table><div style="font-size:11px;color:#6b6b6b;margin-top:4px">${fmt(r.totreg)} registered`
     + (note? ` · ${esc(note)}`:"") + `</div>`;
 }
-const hasReg = () => !!(state.results && Object.values(state.results.precincts).some(p=>p.reg));
+const hasReg = () => !!(state.results && (state.results.registration_file
+  || Object.values(state.results.precincts).some(p=>p.reg)));
 const regShare = (p,k) => (p.reg && p.reg.totreg) ? (p.reg[k]||0)/p.reg.totreg : null;
 /* The predictor: Democratic minus Republican registration share. One number, it is
    what actually separates these precincts, and it keeps the fit explainable — a
@@ -638,6 +687,8 @@ window.addEventListener("hashchange", async ()=>{
     if(m) state.contest=m;
     state._pendingContest=null;
   }
+  await ensureContest(state.contest);
+  if(state.mode==="partyreg"||state.mode==="residual") await ensureRegistration();
   if(state._pendingChoice){
     const m=resolveChoice(state._pendingChoice, (state.catalog[state.contest]||{}).choices||[]);
     if(m) state.choice=m;
@@ -694,6 +745,14 @@ async function loadElection(id){
     (await fetch(`${DATA}/${meta.geo}`)).json()
   ]);
   state.results = results;
+  // split elections resolve their contest files relative to the summary
+  results._base = meta.results.replace(/\/[^/]*$/, "");
+  results._loaded = new Set();
+  // A split summary carries no per-precinct tallies, and a precinct absent from a
+  // contest's file never gets an entry — so guarantee the object exists. Without
+  // this every `p.contests[name]` lookup throws on the first precinct that is not
+  // on that ballot.
+  if(results.split) for(const pr of Object.values(results.precincts)) pr.contests = pr.contests || {};
   state.catalog = results.contests;
   state._geo = geo;
 
@@ -763,6 +822,8 @@ async function loadElection(id){
     state._pendingCity=null;
   }
   document.getElementById("contestSel").value = state.contest;
+  await ensureContest(state.contest);
+  if(state.mode==="partyreg"||state.mode==="residual") await ensureRegistration();
   render();
   // fit once the contest is known: a shared link to a congressional race should open
   // on that district, not on the whole county with a small painted patch. If the link
@@ -1437,11 +1498,8 @@ function wirePanel(){
     state.tab=b.dataset.tab; render();
   });
   document.querySelectorAll('.lrow button.golink').forEach(b=> b.onclick=()=>{
-    const n=b.dataset.contest;
-    if(!(n in state.catalog)) return;
-    state.contest=n; state.choice=null; state.city=null; state.focus=null; state.tab="map";
-    document.getElementById("contestSel").value=n;
-    render(); fitToContest();
+    state.city=null; state.tab="map";
+    setContest(b.dataset.contest,{fit:true});
   });
 }
 
@@ -1571,12 +1629,12 @@ function wireControls(){
     state.focus=null;
     await loadElection(e.target.value);
   };
-  document.getElementById("contestSel").onchange = e=>{
-    state.contest=e.target.value; state.choice=null; render(); fitToContest();
-  };
-  document.querySelectorAll('.modes button[data-mode]').forEach(b=> b.onclick=()=>{
+  document.getElementById("contestSel").onchange = e=>{ setContest(e.target.value,{fit:true}); };
+  document.querySelectorAll('.modes button[data-mode]').forEach(b=> b.onclick=async ()=>{
     if(b.disabled) return;
-    state.mode=b.dataset.mode; syncModes(); render();
+    state.mode=b.dataset.mode; syncModes();
+    if(state.mode==="partyreg"||state.mode==="residual") await ensureRegistration();
+    render();
   });
   document.getElementById("choiceSel").onchange = e=>{ state.choice=e.target.value; render(); };
   const ps=document.getElementById("partySel");

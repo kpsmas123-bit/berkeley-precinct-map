@@ -27,7 +27,7 @@ ARG="${1:-all}"
 COUNTY_FROM="${COUNTY_FROM:-2024-01-01}"
 
 CDIR="$ROOT/data/processed/county"
-mkdir -p "$CDIR/geo" "$CDIR/ids" "$CDIR/results" "$CDIR/tmp"
+mkdir -p "$CDIR/geo" "$CDIR/ids" "$CDIR/results" "$CDIR/split" "$CDIR/tmp"
 
 # prints "<election_id> <certified|preliminary>"
 ids_eligible() { "$PY" - "$ROOT" "$COUNTY_FROM" <<'PY'
@@ -94,6 +94,10 @@ build_one() {
   "$PY" "$ROOT/ingest/fetch_registration.py" "$EID" "$REGF" \
     && "$PY" "$ROOT/ingest/attach_registration.py" "$OUT" "$REGF" \
     || echo "  (registration unavailable for $EID — results unchanged)"
+
+  # One contest at a time is what the map draws, so that is what it should fetch.
+  "$PY" "$ROOT/ingest/split_results.py" "$OUT" "$CDIR/split/$EID" \
+    || echo "  (split failed for $EID — the single-file results still work)"
   return 0
 }
 
@@ -141,6 +145,10 @@ build_preliminary() {
   "$PY" "$ROOT/ingest/fetch_registration.py" "$EID" "$REGF" \
     && "$PY" "$ROOT/ingest/attach_registration.py" "$OUT" "$REGF" \
     || echo "  (registration unavailable for $EID — results unchanged)"
+
+  # One contest at a time is what the map draws, so that is what it should fetch.
+  "$PY" "$ROOT/ingest/split_results.py" "$OUT" "$CDIR/split/$EID" \
+    || echo "  (split failed for $EID — the single-file results still work)"
 
   return 0
 }

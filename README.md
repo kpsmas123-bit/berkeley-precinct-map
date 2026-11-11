@@ -345,6 +345,39 @@ Republican, so a registration choropleth there is one flat colour.
 70% Democratic voting 70% for a Democrat says nothing about which individuals did
 what — the ecological fallacy — and the about box says so on both maps.
 
+### Per-contest loading
+
+The county map draws one contest at a time but was downloading all of them: 110 KB
+gzipped for Nov 2026 to render a single choropleth. `ingest/split_results.py` writes
+
+```
+split/<id>/summary.json        contests, cities, county + city rollups, turnout,
+                               status, and per-precinct metadata — no tallies
+split/<id>/c/<contest>.json    one contest's per-precinct tallies
+split/<id>/registration.json   per-precinct party registration
+```
+
+and the frontend fetches a contest when it is picked. Registration is split off too:
+it was over half the summary's weight and only the two registration modes read it.
+
+| Nov 2026 county, gzipped | before | after |
+|---|---|---|
+| first paint | 110 KB | **16 KB** |
+| June 2026 primary | 173 KB | **27 KB** |
+
+Nothing is discarded — the bytes arrive when they are needed. It works because every
+read in `county.html` is `precinct.contests[state.contest]`; nothing iterates a
+precinct's other contests. Contest slugs match the frontend's `slug()`, so a
+contest's file is predictable from its permalink.
+
+The one trap: a split summary carries no per-precinct `contests`, and a precinct
+absent from a contest's file never gets an entry, so `loadElection` seeds every
+precinct with an empty `contests` object. Without it the first precinct not on that
+ballot throws.
+
+Elections without a `split/` directory still load as a single file, so the two
+formats can coexist.
+
 ### Shareable links
 
 Both maps keep their full state in the URL hash, so any view can be linked:

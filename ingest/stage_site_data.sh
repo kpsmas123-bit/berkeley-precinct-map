@@ -20,6 +20,10 @@ if [ -d "$ROOT/data/processed/county" ]; then
   if compgen -G "$ROOT/data/processed/county/results/*.json" > /dev/null; then
     cp "$ROOT/data/processed/county/results/"*.json "$ROOT/site/data/county/results/"
   fi
+  if [ -d "$ROOT/data/processed/county/split" ]; then
+    rm -rf "$ROOT/site/data/county/split"
+    cp -R "$ROOT/data/processed/county/split" "$ROOT/site/data/county/split"
+  fi
   if compgen -G "$ROOT/data/processed/county/geo/*.geojson" > /dev/null; then
     cp "$ROOT/data/processed/county/geo/"*.geojson "$ROOT/site/data/county/geo/"
   fi
