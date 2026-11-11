@@ -20,7 +20,11 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 PY="$ROOT/.venv/bin/python"; [ -x "$PY" ] || PY="python3"
 ARG="${1:-all}"
-COUNTY_FROM="${COUNTY_FROM:-2020-01-01}"
+# Recent elections only. Pre-2024 county results were dropped deliberately: the
+# patterns have shifted enough to be of limited use, and each one is ~110-280 KB of
+# precinct tallies. Raising this back (COUNTY_FROM=2020-01-01 ./build_county.sh)
+# rebuilds them from the raw canvasses, which are still in data/raw.
+COUNTY_FROM="${COUNTY_FROM:-2024-01-01}"
 
 CDIR="$ROOT/data/processed/county"
 mkdir -p "$CDIR/geo" "$CDIR/ids" "$CDIR/results" "$CDIR/tmp"
