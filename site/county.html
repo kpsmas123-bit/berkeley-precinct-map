@@ -170,61 +170,26 @@
 <div id="about" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
   <div class="box">
     <h2 id="aboutTitle">About this map</h2>
-    <p>Precinct-level results for <b>every precinct in Alameda County</b>, limited to the
-       contests that appear on essentially every ballot: statewide constitutional offices,
-       U.S. President / Senate / House, state propositions, region-wide district measures,
-       and the 2021 gubernatorial recall.</p>
-    <p><b>Local races are deliberately left out.</b> A city council or school board race shown
-       countywide is a mostly-empty map. Berkeley's local contests live on the
-       <a href="./index.html">Berkeley precinct map</a>.</p>
-    <ul>
+    <p>Precinct-level results for <b>every precinct in Alameda County</b>, for the contests on
+       essentially every ballot. Local races live on the <a href="./index.html">Berkeley map</a>.</p>
+<ul>
       <li><b>Precinct IDs are not stable between elections</b> — each election uses the geometry
           the county published for it. Results are never joined across elections.</li>
-      <li><b>Jurisdiction labels</b> come from the city contests a precinct actually votes in,
-          falling back to the county's city outlines. That matters on city borders, where a
-          precinct's polygon can sit inside a neighbouring city while its voters are on the
-          other city's ballot.</li>
-      <li><b>Shares</b> are votes for a choice over all votes cast in that contest in that
-          precinct (not over ballots cast).</li>
-      <li><b>Party presidential primaries</b> are shown per party. Only that party's voters
-          received the ballot, so those shares are within-party, not citywide.</li>
-      <li><b>Party registration</b> comes from the <a href="https://statewidedatabase.org/" target="_blank" rel="noopener">California Statewide Database</a>,
-          the only source publishing it by precinct — the Secretary of State stops at county and
-          district level. It is joined to these precincts by id, not by overlapping shapes.
-          Each snapshot is taken for one election; where none exists yet the nearest earlier one
-          is used and the panel says so.</li>
-      <li><b>“vs registration”</b> is the one worth looking at. A plain share map is mostly a map
-          of where the Democrats live; this fits a line through every precinct's Democratic-minus-
-          Republican registration margin and colours what is <i>left over</i> — where a choice ran
-          ahead of or behind what that precinct's registration predicts. The legend reports the
-          fit's R². Like “stands out”, a precinct is only coloured if the gap clears 3 points and
-          its own sampling noise.</li>
+      <li><b>An election still being counted is marked “preliminary”</b> and built without a
+          certified canvass. Figures move with each county update and are superseded by the
+          certified Statement of Vote.</li>
+      <li><b>A blank precinct is not always “not on this ballot.”</b> State law strips the
+          choices from any ballot type with fewer than ten ballots in a precinct, so a handful
+          of very small precincts have no result to show.</li>
+      <li><b>“Stands out” and “vs registration” map a difference, not a level</b> — how far a
+          precinct sits from the county average, or from what its party registration predicts.
+          Both only colour a precinct when the gap clears 3 points <i>and</i> its own sampling
+          noise.</li>
       <li><b>These are precinct patterns, not voter behaviour.</b> A precinct registered 70%
-          Democratic voting 70% for a Democrat tells you nothing about which individuals did what —
-          the classic ecological fallacy. Read it as geography, not as people.</li>
-      <li><b>“Stands out”</b> flags precincts whose share differs from the countywide share by
-          more than 3 points <i>and</i> beyond normal sampling noise — not merely a big-looking gap.</li>
-      <li><b>An election still being counted</b> is marked <i>preliminary</i> and built without a
-          certified canvass, from whichever of three sources the county has released. Best is the
-          <b>cast vote record</b> — one anonymised record per ballot, carrying the precinct and
-          every contest on it — which the Registrar provides on request and which maps every big
-          race at once. Failing that, the county's <b>results map</b> feed carries per-precinct
-          votes for just the one or two contests it chooses to map, and its <b>results portal</b>
-          carries countywide totals for every race with no geography at all. The
-          <b>Latest county totals</b> tab lists all of them; the map shows the ones with precinct
-          figures. None of these sources carries per-precinct registration, so turnout is off for
-          those elections, and all are superseded by the certified Statement of Vote.</li>
-      <li><b>Precincts with no result in a cast vote record.</b> State law (2 CCR 20126) requires a
-          published cast vote record to have the choices stripped from any ballot that could be
-          traced to an individual voter. In a small enough precinct that covers every ballot, so
-          the precinct is shown as no-data rather than as zero votes. The panel says how many.</li>
-      <li><b>Region-wide district measures</b> (a measure put to the whole county by a district
-          that spans it, such as the 2026 transit measure) are included. Measures from one city,
-          school or park district are not — they would leave the county map mostly empty.</li>
+          Democratic voting 70% for a Democrat says nothing about which individuals did what.</li>
     </ul>
-    <p style="font-size:12px;color:#6b6b6b">Tallies: Alameda County Registrar of Voters
-       (Statement of Vote). Geometry: Alameda County Open Data Hub. Basemap: Esri, HERE,
-       Garmin, © OpenStreetMap contributors. No cookies, no analytics.</p>
+    <p style="font-size:12px;color:#6b6b6b">Sources, methods and known traps:
+       <a class="src" href="https://github.com/kpsmas123-bit/berkeley-precinct-map#readme" target="_blank" rel="noopener">the project README</a>.</p>
     <button class="ok" id="aboutOk">Got it</button>
   </div>
 </div>

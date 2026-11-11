@@ -195,43 +195,24 @@
 <div id="ctlBackdrop"></div>
 <div id="about"><div class="box">
   <h2>Berkeley precinct election results, 2014–2026</h2>
-  <p>Each shape is a <b>voting precinct</b> in Berkeley. Pick an <b>election</b> and a <b>contest</b>, then
-  color the map by <b>who won</b>, <b>turnout</b>, or a candidate's <b>share</b>. Click any precinct or
-  council district for its full results table.</p>
-  <p style="font-weight:600;margin-bottom:2px">A few things to know:</p>
-  <ul>
-    <li><b>Gray precincts</b> mean the contest <b>wasn't on that ballot</b> — not zero votes.</li>
-    <li><b>Ranked-choice</b> contests show <b>first-choice votes only</b> (no precinct-level RCV rounds exist).</li>
-    <li>District lines <b>changed in the 2021 redistricting</b>, so "District 1" is a different area before vs. after.</li>
-    <li>Older elections had <b>no certified precinct canvass</b>; those totals are shown but marked "not independently reconciled."</li>
-    <li>Statewide propositions show <b>only Berkeley's share</b>, not the statewide result.</li>
-    <li>An election marked <b>preliminary</b> is still being counted. The county does not publish the
-        certified precinct canvass until about a month after election day, but its live results map does
-        carry per-precinct votes for a contest or two — those are mapped for real; every other contest
-        on that ballot is citywide totals only, in the <b>Latest Berkeley totals</b> tab. Per-precinct
-        registration is not published either, so turnout is off for those elections, and every figure is
-        superseded by the certified Statement of Vote.</li>
-    <li><b>Party registration</b> per precinct comes from the
-        <a href="https://statewidedatabase.org/" target="_blank" rel="noopener">California Statewide
-        Database</a> — the only source publishing it below county level — joined by precinct id.
-        It is shown as numbers rather than a map: Berkeley is about 74% Democratic and 3%
-        Republican, so a registration choropleth here would be one flat colour. The
-        <a href="./county.html">county map</a> has a <b>“vs registration”</b> mode, which is where
-        that variation actually lives. Registration is a snapshot taken for one election; where
-        none exists for this one yet, the nearest earlier snapshot is shown and labelled.</li>
-    <li><b>Swing</b> compares one election with another. Precinct lines are redrawn every
-        election, so nothing can be compared across years as published: every election is
-        apportioned onto <b>today's</b> lines by area overlap first, and reduced to three
-        indicators measured the same way throughout — turnout, Democratic share of the
-        two-party vote at the top of the ticket, and pooled YES on Berkeley measures. The
-        panel carries the full series per council district. Years whose lines were very
-        different are flagged (⚑); for those, trust the district figures and not the
-        precinct shading.</li>
-    <li>For statewide offices, Congress and propositions <b>across all of Alameda County</b>, see the
-        <a href="./county.html">county map</a>.</li>
-  </ul>
-  <p style="font-size:12px;color:#666">Source: Alameda County Registrar of Voters. District lines: City of
-  Berkeley. Basemap: Esri, HERE, Garmin, © OpenStreetMap contributors. No tracking or cookies.</p>
+  <p>Each shape is a <b>voting precinct</b>. Pick an election and a contest, then colour the map
+  by who won, turnout, a candidate's share, or how a precinct compares. Click any precinct or
+  council district for its full results.</p>
+<ul>
+      <li><b>Gray precincts</b> mean the contest <b>wasn't on that ballot</b> — not zero votes.</li>
+      <li><b>Ranked-choice</b> contests show <b>first-choice votes only</b> (no precinct-level
+          RCV rounds exist).</li>
+      <li>District lines <b>changed in the 2021 redistricting</b>, so “District 1” is a different
+          area before vs. after.</li>
+      <li><b>An election marked “preliminary”</b> is still being counted: no certified canvass
+          exists yet, figures move with each county update, and per-precinct turnout is not
+          published until certification.</li>
+      <li><b>Swing</b> compares two elections. Precinct lines are redrawn every election, so each
+          one is apportioned onto <b>today's</b> lines first. Years whose lines were very
+          different are flagged ⚑ — trust the district figures there, not the precinct shading.</li>
+    </ul>
+    <p style="font-size:12px;color:#666">Sources, methods and known traps:
+       <a class="src" href="https://github.com/kpsmas123-bit/berkeley-precinct-map#readme" target="_blank" rel="noopener">the project README</a>.</p>
   <button class="ok" id="aboutOk">Got it</button>
 </div></div>
 <div id="editor"><div class="box">
