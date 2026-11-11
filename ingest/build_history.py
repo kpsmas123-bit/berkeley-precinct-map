@@ -43,6 +43,7 @@ TOP_OF_TICKET = {
     "2020-11-general": ("President and Vice President", r"BIDEN",   r"TRUMP"),
     "2022-11-general": ("Governor",                   r"NEWSOM",  r"DAHLE"),
     "2024-11-general": ("President and Vice President", r"HARRIS",  r"TRUMP"),
+    "2026-11-general": ("Governor",                     r"BECERRA", r"HILTON"),
 }
 
 LOCAL_MEASURE = re.compile(r"(City of Berkeley|Berkeley USD)", re.I)

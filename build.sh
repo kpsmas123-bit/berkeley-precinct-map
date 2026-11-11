@@ -107,6 +107,12 @@ done <<< "$IDS"
 echo "== competitive ballot-measure slots (Feature 3 plumbing) =="
 "$PY" "$ROOT/ingest/build_measures.py"
 
+echo "== precinct crosswalk onto the current lines =="
+"$PY" "$ROOT/ingest/build_crosswalk.py" || echo "  (crosswalk failed — history will be skipped)"
+
+echo "== historical indicators by zone =="
+"$PY" "$ROOT/ingest/build_history.py" || echo "  (history failed)"
+
 echo "== featured contests (auto-rank) =="
 "$PY" "$ROOT/ingest/build_featured.py"
 

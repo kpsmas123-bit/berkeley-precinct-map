@@ -236,6 +236,13 @@
         <button data-mode="turnout">Turnout</button>
         <button data-mode="deviation" title="Where a precinct voted clearly differently from its district">Stands out</button>
         <button data-mode="alignment" id="alignBtn" style="display:none">Alignment</button>
+        <button data-mode="swing" id="swingBtn" title="How each precinct and council district has changed over time">Swing</button>
+      </div>
+      <div id="swingWrap" style="display:none">
+        <label for="indicatorSel">What to compare</label>
+        <select id="indicatorSel"></select>
+        <label for="compareSel">Compare with</label>
+        <select id="compareSel"></select>
       </div>
       <button class="morebtn" id="moreToggle">More views ▾</button>
       <div class="modes moreviews" id="moreViews" style="display:none">
@@ -298,6 +305,14 @@
         <a href="./county.html">county map</a> has a <b>“vs registration”</b> mode, which is where
         that variation actually lives. Registration is a snapshot taken for one election; where
         none exists for this one yet, the nearest earlier snapshot is shown and labelled.</li>
+    <li><b>Swing</b> compares one election with another. Precinct lines are redrawn every
+        election, so nothing can be compared across years as published: every election is
+        apportioned onto <b>today's</b> lines by area overlap first, and reduced to three
+        indicators measured the same way throughout — turnout, Democratic share of the
+        two-party vote at the top of the ticket, and pooled YES on Berkeley measures. The
+        panel carries the full series per council district. Years whose lines were very
+        different are flagged (⚑); for those, trust the district figures and not the
+        precinct shading.</li>
     <li>For statewide offices, Congress and propositions <b>across all of Alameda County</b>, see the
         <a href="./county.html">county map</a>.</li>
   </ul>
@@ -359,7 +374,36 @@ const CAT = ["#0072B2","#E69F00","#009E73","#CC79A7","#56B4E9","#D55E00","#F0E44
 const YESNO = { "YES":"#2b8cbe", "NO":"#e08214" };
 const RAMP = ["#f7fbff","#c6dbef","#6baed6","#2171b5","#08306b"];
 const MAP_LABEL = { "berkeley-council-2021":"2021 redistricting", "berkeley-council-2013":"2013 map (2010 census)" };
-const MODES = ["winner","choice","turnout","deviation","alignment"];
+const MODES = ["winner","choice","turnout","deviation","alignment","swing"];
+/* ---- the historical layer -------------------------------------------------
+   Precinct lines are redrawn every election, so nothing can be compared across
+   years as published. ingest/build_crosswalk.py apportions every election onto
+   the CURRENT lines by area overlap, and ingest/build_history.py reduces each
+   one to three indicators measured the same way throughout. Both are built in
+   build.sh's cross-election pass and fetched only when this mode is opened. */
+let HIST=null;
+const SWING_MAX = 0.20;        // ±20 points saturates the diverging scale
+async function ensureHistory(){
+  if(HIST) return HIST;
+  try { HIST = await (await fetch(`${DATA}/history.json`)).json(); }
+  catch(e){ console.error("history fetch failed:", e && e.message); HIST=false; }
+  return HIST;
+}
+const histElection = id => (HIST && HIST.elections.find(e=>e.id===id)) || null;
+function histValue(id, ind, key, scope){
+  const e=histElection(id); if(!e) return null;
+  const v=e.values && e.values[ind]; if(!v) return null;
+  if(scope==="city" || key==null) return v.city==null? null : v.city;
+  const src = scope==="precinct" ? (v.precincts||{}) : (v.districts||{});
+  const x=src[key];
+  return x==null? null : x;
+}
+function swingAt(key, scope){
+  if(!HIST || !state.compare) return null;
+  const a=histValue(state.election, state.indicator, key, scope);
+  const b=histValue(state.compare,  state.indicator, key, scope);
+  return (a==null||b==null)? null : a-b;
+}
 const DEV_MAX = 0.15;          // 15 pts saturates the diverging scale
 const MATERIAL = 0.03;         // 3-pt materiality gate
 const NEUTRAL = "#e8e8e6", UNSCORED = "#e6ddc7";
@@ -406,7 +450,8 @@ function regCard(pids, label){
 
 const state = { election:null, contest:null, mode:"winner", choice:null, baseline:"district",
                 district:null, focus:null, results:null, catalog:null, dmembers:{},
-                alignment:{}, measures:{}, featured:[], tab:"map" };
+                alignment:{}, measures:{}, featured:[], tab:"map",
+                indicator:"major_dem", compare:null };
 const TABS = ["map","latest"];
 let map, elections;
 
@@ -654,6 +699,8 @@ async function loadElection(id) {
   }
 
   if (isPending()) { renderPending(); return; }   // canvass not published yet
+  // a shared /swing/ link arrives with no history loaded yet
+  if (state.mode==="swing" && !HIST) { await ensureHistory(); }
   buildContestPicker();
   if (!state.contest || !(state.contest in state.catalog)) state.contest = pickDefaultContest();
   if (state.district!=null && !(state.district in state.results.districts)) { state.district = null; state.focus = null; }
@@ -847,6 +894,11 @@ function render(){
   if (state._pendingChoiceSlug){ const m=resolveChoice(state._pendingChoiceSlug, state.catalog[state.contest]?.choices||[]); if(m)state.choice=m; state._pendingChoiceSlug=null; }
 
   updateAlignVisibility();
+  const sw=document.getElementById("swingWrap");
+  if(sw){
+    sw.style.display = state.mode==="swing" ? "block" : "none";
+    if(state.mode==="swing" && HIST) buildSwingPickers();
+  }
   // Neither live feed carries per-precinct registration, so a preliminary election
   // has nothing to colour a turnout map with.
   const tb=document.querySelector('.modes button[data-mode="turnout"]');
@@ -991,6 +1043,13 @@ function paintChoropleth(cmap){
     for(const pid of Object.keys(P)){ const ai=alignmentIndex(pid); setC(pid, ai?divColor((ai.index-3)/2):UNSCORED); }
     return;
   }
+  if(state.mode==="swing"){
+    for(const pid of Object.keys(P)){
+      const d=swingAt(pid,"precinct");
+      setC(pid, d==null? "#eee" : divColor(d/SWING_MAX));
+    }
+    return;
+  }
   for(const [pid,p] of Object.entries(P)){
     let color="#e5e5e5";
     if(state.mode==="turnout"){ color=rampColor(p.registered? p.ballots_cast/p.registered:0); }
@@ -1009,6 +1068,19 @@ function setHighlights(){
 
 function buildLegend(cmap){
   const el=document.getElementById("legend"); const cat=state.catalog[state.contest];
+  if(state.mode==="swing"){
+    const ind=(HIST&&HIST.indicators[state.indicator])||{label:state.indicator};
+    const from=histElection(state.compare), q=from&&from.quality;
+    el.innerHTML=`<div style="font-weight:600;margin-bottom:4px">Change · ${esc(ind.label||"")}</div>`
+      + divBar(["−20","down","same","up","+20 pts"])
+      + `<div style="font-size:11px;color:#595959;margin-top:3px">`
+      + (from? `Since <b>${esc(from.name)}</b>.` : `Pick an election to compare with.`)
+      + ` <b>Blue</b> = higher now · <b>orange</b> = lower.</div>`
+      + (q && q.precinct<0.6
+          ? `<div style="font-size:11px;color:#8a5a00;margin-top:3px">⚑ ${esc(from.name)} used very different precinct lines (${Math.round(q.precinct*100)}% exact) — read the district panel, not the precinct shading.</div>` : "")
+      + `<div class="row" style="margin-top:3px"><span class="sw" style="background:#eee"></span>not measured that year</div>`;
+    return;
+  }
   if(state.mode==="deviation"){
     const flag = cat.verified===false, bw=state.baseline==="city"?"citywide":"district";
     el.innerHTML=`<div style="font-weight:600;margin-bottom:4px">How each precinct compares · ${esc(state.choice)}</div>`
@@ -1151,7 +1223,92 @@ function creditHtml(vintage){
     + ` District lines: ${esc(vintage)}. Districts cover a different area before vs. after the 2021 redistricting. `
     + (src.election_page?`<a class="src" href="${src.election_page}" target="_blank" rel="noopener">source</a>`:"")+`</div>`;
 }
+/* ---- zones: the same indicator for every council district, every election ----
+   The swing map answers "where", this answers "since when" — the two halves of
+   the historical view. Sparklines rather than a chart library: eight districts
+   times sixteen points is a polyline, not a dependency. */
+function sparkline(series, w, h){
+  const pts=series.filter(p=>p.v!=null);
+  if(pts.length<2) return `<svg width="${w}" height="${h}"></svg>`;
+  const vs=pts.map(p=>p.v), lo=Math.min(...vs), hi=Math.max(...vs), span=(hi-lo)||1;
+  const n=series.length-1;
+  const xy=pts.map(p=>[ (p.i/n)*(w-2)+1, h-1-((p.v-lo)/span)*(h-2) ]);
+  const last=xy[xy.length-1];
+  return `<svg width="${w}" height="${h}" aria-hidden="true" style="vertical-align:middle">`
+    + `<polyline fill="none" stroke="#9a9a94" stroke-width="1.2" points="${xy.map(c=>c.join(",")).join(" ")}"/>`
+    + `<circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="2.2" fill="#1a1a1a"/></svg>`;
+}
+
+function swingSeries(key, scope){
+  return HIST.elections.map((e,i)=>({i, id:e.id, name:e.name, date:e.date,
+                                     v:histValue(e.id, state.indicator, key, scope)}));
+}
+
+function swingHeaderHtml(){
+  const ind=(HIST&&HIST.indicators[state.indicator])||{label:state.indicator,help:""};
+  const to=histElection(state.election), from=histElection(state.compare);
+  const d=swingAt(null,"city");
+  const fmtv=v=> v==null? "—" : (100*v).toFixed(1)+"%";
+  return `<div class="vintage">${esc(ind.label)}${from&&to?` · ${esc(from.name)} → ${esc(to.name)}`:""}</div>`
+    + `<div class="subtotal"><div class="lbl">Citywide</div>`
+    + `<table class="res"><tr><td>${esc(from?from.name:"—")}</td><td class="v">${fmtv(from&&histValue(state.compare,state.indicator,null,"city"))}</td></tr>`
+    + `<tr class="win"><td>${esc(to?to.name:"—")}</td><td class="v">${fmtv(to&&histValue(state.election,state.indicator,null,"city"))}</td></tr></table>`
+    + `<div style="font-size:12px;margin-top:5px">Change: <b style="color:${d==null?"#6b6b6b":d>0?"#2166ac":"#b35806"}">`
+    + `${d==null?"—":(d>0?"+":"")+(100*d).toFixed(1)+" pts"}</b></div></div>`
+    + `<div class="noballot" style="color:#6b6b6b">${esc(ind.help||"")}</div>`;
+}
+
+function swingZonesHtml(){
+  const rows=Object.keys(HIST.districts||{}).sort((a,b)=>(+a)-(+b)).map(d=>{
+    const ser=swingSeries(d,"district");
+    const dv=swingAt(d,"district");
+    return {d, ser, dv, mem:state.dmembers[d]};
+  });
+  const q=(histElection(state.compare)||{}).quality||{};
+  return `<div class="dhead"><h2>Berkeley — change over time</h2>`
+    + `<span class="mem">by council district</span></div>`
+    + swingHeaderHtml()
+    + `<div class="subtotal-lbl" style="text-transform:uppercase;font-size:11px;letter-spacing:.5px;color:var(--muted);margin:10px 0 2px">By council district — click to drill in</div>`
+    + rows.map(r=>{
+        const col=r.dv==null?"#6b6b6b":r.dv>0?"#2166ac":"#b35806";
+        const qd=(q.district_exactness||{})[r.d];
+        return `<button class="ph distrow" data-d="${esc(r.d)}" type="button">`
+          + `<span class="pid">District ${esc(r.d)}</span>`
+          + (r.mem?` <span style="font-size:11px;color:var(--muted)">${esc(r.mem)}</span>`:"")
+          + `<span style="float:right;font-size:12px">${sparkline(r.ser,56,16)} `
+          + `<b style="color:${col}">${r.dv==null?"—":(r.dv>0?"+":"")+(100*r.dv).toFixed(1)}</b></span>`
+          + (qd!=null && qd<0.7 ? `<div style="font-size:10.5px;color:#8a5a00">⚑ ${Math.round(qd*100)}% of this district's area is traceable to ${esc((histElection(state.compare)||{}).name||"then")}</div>`:"")
+          + `</button>`;
+      }).join("")
+    + `<div style="font-size:11px;color:#6b6b6b;margin-top:10px">Every election is apportioned onto
+       <b>today's</b> precinct and district lines by area overlap, so the series is comparable
+       end to end. The ⚑ marks years whose lines were different enough that the district figure
+       is an estimate; the precinct shading on the map is weaker still in those years.</div>`;
+}
+
+function swingDistrictHtml(d){
+  const ser=swingSeries(d,"district"), ind=HIST.indicators[state.indicator]||{};
+  const vals=ser.filter(x=>x.v!=null);
+  const hi=vals.length?Math.max(...vals.map(x=>x.v)):0, lo=vals.length?Math.min(...vals.map(x=>x.v)):0;
+  return `<div class="dhead"><h2>District ${esc(d)}</h2>`
+    + `<button class="reset" id="resetBtn">↩ citywide</button></div>`
+    + (state.dmembers[d]?`<div class="vintage">${esc(state.dmembers[d])}</div>`:"")
+    + swingHeaderHtml()
+    + `<div class="subtotal"><div class="lbl">${esc(ind.label||"")} in District ${esc(d)}</div>`
+    + `<div style="margin:4px 0">${sparkline(ser,320,40)}</div>`
+    + `<table class="res">` + ser.map(x=>
+        `<tr class="${x.id===state.election?"win":""}"><td>${esc(x.name.replace(/ Election$/,""))}</td>`
+        + `<td class="v">${x.v==null?"—":(100*x.v).toFixed(1)+"%"}</td></tr>`).join("")
+    + `</table></div>`;
+}
+
 function showCitywide(){
+  if(state.mode==="swing" && HIST){
+    const panel=document.getElementById("panel");
+    panel.innerHTML = swingZonesHtml() + creditHtml(MAP_LABEL[state.results.district_map]||state.results.district_map);
+    panel.querySelectorAll(".distrow").forEach(el=> el.onclick=()=>{ state.district=el.dataset.d; state.focus=null; render(); });
+    return;
+  }
   const panel=document.getElementById("panel");
   const cat=state.catalog[state.contest], cmap=colorForContest();
   const vintage=MAP_LABEL[state.results.district_map]||state.results.district_map;
@@ -1186,6 +1343,14 @@ function showCitywide(){
 }
 function showDistrict(){
   if(!state.district) return showCitywide();
+  if(state.mode==="swing" && HIST){
+    const panel=document.getElementById("panel");
+    panel.innerHTML = swingDistrictHtml(state.district)
+      + creditHtml(MAP_LABEL[state.results.district_map]||state.results.district_map);
+    const rb=document.getElementById("resetBtn");
+    if(rb) rb.onclick=()=>{ state.district=null; state.focus=null; render(); };
+    return;
+  }
   const panel=document.getElementById("panel");
   const cat=state.catalog[state.contest], cmap=colorForContest();
   const d=state.district, member=state.dmembers[d];
@@ -1287,7 +1452,13 @@ function syncSheetLabel(){
   const lbl=g.querySelector(".lbl");
   let txt="";
   try {
-    if(state.focus) txt=`Precinct ${state.focus}`;
+    if(state.mode==="swing" && HIST){
+      const d=swingAt(state.district||null, state.district?"district":"city");
+      const ind=(HIST.indicators[state.indicator]||{}).label||state.indicator;
+      txt = (state.district? `District ${state.district} · `:"")
+          + `<b>${d==null?"—":(d>0?"+":"")+(100*d).toFixed(1)+" pts"}</b> · ${esc(ind)}`;
+    }
+    else if(state.focus) txt=`Precinct ${state.focus}`;
     else if(state.district) txt=`District ${state.district}`;
     else {
       const agg=aggregate2(state.contest), tot=sumv(agg);
@@ -1372,6 +1543,30 @@ function wirePhoneUI(){
   document.addEventListener("keydown", e=>{ if(e.key==="Escape") openControls(false); });
 }
 
+/* Swing compares this election with another, so it needs both pickers filled
+   and a default partner: the previous election of the same kind, since a
+   primary and a general are not comparable on turnout. */
+function buildSwingPickers(){
+  const isel=document.getElementById("indicatorSel"), csel=document.getElementById("compareSel");
+  const here=histElection(state.election);
+  const inds=Object.entries(HIST.indicators||{}).filter(([k])=>histValue(state.election,k,null,"city")!=null);
+  const list=inds.length?inds:Object.entries(HIST.indicators||{});
+  if(!list.some(([k])=>k===state.indicator)) state.indicator=list[0][0];
+  isel.innerHTML=""; list.forEach(([k,v])=> isel.add(new Option(v.label||k,k)));
+  isel.value=state.indicator;
+
+  const others=HIST.elections.filter(e=>e.id!==state.election
+    && histValue(e.id,state.indicator,null,"city")!=null);
+  if(!state.compare || !others.some(e=>e.id===state.compare)){
+    const sameKind=others.filter(e=>!here || e.kind===here.kind);
+    const pool=sameKind.length?sameKind:others;
+    state.compare = pool.length? pool[pool.length-1].id : null;   // most recent comparable
+  }
+  csel.innerHTML="";
+  others.slice().reverse().forEach(e=> csel.add(new Option(e.name.replace(/ Election$/,""), e.id)));
+  if(state.compare) csel.value=state.compare;
+}
+
 function syncModeButtons(){
   document.querySelectorAll(".modes button").forEach(b=>b.classList.toggle("active", b.dataset.mode===state.mode));
   if(state.mode==="choice") document.getElementById("moreViews").style.display="flex";
@@ -1407,7 +1602,21 @@ function wireControls(){
   about.onclick=e=>{ if(e.target===about) about.style.display="none"; };
   document.getElementById("contestSel").onchange=e=>{ state.contest=e.target.value; state.focus=null; render(); };
   document.getElementById("choiceSel").onchange=e=>{ state.choice=e.target.value; render(); };
-  document.querySelectorAll(".modes button").forEach(b=> b.onclick=()=>{
+  document.getElementById("indicatorSel").onchange=e=>{ state.indicator=e.target.value; state.compare=null; render(); };
+  document.getElementById("compareSel").onchange=e=>{ state.compare=e.target.value; render(); };
+  document.querySelectorAll(".modes button").forEach(b=> b.onclick=async ()=>{
+    if(b.dataset.mode==="swing"){
+      await ensureHistory();
+      if(!HIST){ return; }
+      // the series is expressed on the base election's lines, so stand on them
+      if(HIST.base_election && state.election!==HIST.base_election
+         && elections.some(e=>e.id===HIST.base_election)){
+        state.mode="swing"; state.district=null; state.focus=null;
+        document.getElementById("electionSel").value=HIST.base_election;
+        await loadElection(HIST.base_election);
+        return;
+      }
+    }
     state.mode=b.dataset.mode;
     if(state.mode==="alignment" && !contestScored(state.election, state.contest)){
       const sc=scoredContests(state.election).filter(n=>n in state.catalog && state.catalog[n].verified!==false);
@@ -1480,6 +1689,7 @@ function updateHash(){
   const parts=[state.election, slug(state.contest), state.mode];
   if(state.mode==="choice"||state.mode==="deviation") parts.push(bareSlug(state.choice));  // party-free: durable across cycles
   if(state.mode==="deviation") parts.push("b-"+state.baseline);
+  if(state.mode==="swing"){ parts.push("i-"+state.indicator); if(state.compare) parts.push("v-"+state.compare); }
   if(isPartial() && state.tab!=="map") parts.push("t-"+state.tab);
   if(state.district) parts.push("d"+state.district);
   history.replaceState(null,"","#"+parts.join("/"));
@@ -1493,6 +1703,8 @@ function parseHash(){
   const btok=h.find(t=>/^b-(district|city)$/.test(t)); if(btok) state.baseline=btok.slice(2);
   syncBaselineButtons();
   const dtok=h.find(t=>/^d\d+$/.test(t)); if(dtok) state.district=dtok.slice(1);   // district keys are numeric 1..8
+  const itok=h.find(t=>/^i-/.test(t)); if(itok) state.indicator=itok.slice(2);
+  const vtok=h.find(t=>/^v-/.test(t)); if(vtok) state.compare=vtok.slice(2);
   const ttok=h.find(t=>/^t-/.test(t)); state.tab = ttok && TABS.includes(ttok.slice(2)) ? ttok.slice(2) : "map";
   state._pendingContestSlug=h[1]; state._pendingChoiceSlug=((state.mode==="choice"||state.mode==="deviation")?h[3]:null);
 }
