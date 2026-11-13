@@ -27,8 +27,11 @@ import json
 import os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CDIR = os.path.join(ROOT, "data", "processed", "county")
-OUT = os.path.join(CDIR, "city_overrides.json")
+PROC = os.path.join(ROOT, "data", "processed")
+CDIR = os.path.join(PROC, "county")
+# Not under county/: that tree is a regenerable build intermediate and is ignored,
+# but this file is knowledge learned from builds that may no longer exist on disk.
+OUT = os.path.join(PROC, "city_overrides.json")
 
 
 def main():
@@ -57,6 +60,17 @@ def main():
             if ballot and outline and ballot != outline:
                 overrides[pid] = ballot
                 provenance[pid] = {"city": ballot, "outline": outline, "learned_from": eid}
+
+    # Merge, do not rewrite. A correction learned from an election is still true
+    # after that election's build is dropped — pruning the county map to 2024+
+    # silently cost two Hayward precincts their labels, because the 2022 build that
+    # taught them was no longer on disk to teach them again.
+    if os.path.exists(OUT):
+        prev = json.load(open(OUT))
+        for pid, city in prev.get("overrides", {}).items():
+            overrides.setdefault(pid, city)
+            provenance.setdefault(pid, prev.get("provenance", {}).get(pid, {
+                "city": city, "outline": "?", "learned_from": "earlier build"}))
 
     json.dump({"note": ("precinct -> city corrections learned from certified builds, "
                         "where the city contests a precinct votes in disagree with the "

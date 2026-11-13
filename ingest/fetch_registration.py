@@ -3,33 +3,7 @@
 Precinct-level VOTER PARTY REGISTRATION, joined onto an election's consolidated
 precincts.
 
-Why this exists
----------------
-Nothing the county publishes with results carries party. The Statement of Vote, the
-live results feed and the Cast Vote Record all give one undifferentiated "registered
-voters" count — the CVR does not even give that. Without party there is no way to ask
-the question worth asking: not "where did this candidate do well" (that is mostly a
-map of where Democrats live) but "where did this candidate do better or worse than
-the precinct's registration says they should".
-
-Two public sources, joined here:
-
-1. The **California Statewide Database** (UC Berkeley), the only source publishing
-   registration by party at precinct level — the Secretary of State's Report of
-   Registration stops at county and district, and the county's own eData is
-   countywide.
-     https://statewidedatabase.org/pub/data/<CODE>/c001/c001_<code>_registration_by_<code>_rgprec.csv
-   Columns: totreg_r, dem, rep, aip, paf, msc, lib, nlp, grn, ref, dcl.
-   "dcl" is Declined to State, today's No Party Preference.
-
-2. The county's own **results-map feed**, whose `homePrecincts` lists the registration
-   precincts consolidated into each voting precinct. Past elections have their own
-   feed file, so the mapping is per-election rather than assumed.
-
-The join is exact, not geometric: SWDB's `rgprec` is the county's 6-digit registration
-precinct id plus a 2-digit split suffix (20010000 -> 200100 + 00), so stripping the
-suffix gives a home precinct, and `homePrecincts` gives the consolidated precinct it
-belongs to. No area-overlap estimation anywhere.
+See docs/party-registration.md for where the data comes from and how it joins.
 
 Honesty constraints
 -------------------

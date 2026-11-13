@@ -3,36 +3,7 @@
 Build a PRELIMINARY countywide results file from the county's two live feeds, for an
 election whose certified Statement of Vote does not exist yet.
 
-Why this exists
----------------
-Alameda County publishes the precinct-level Statement of Vote only at or near
-certification, ~30 days after election day, so for a month after an election the
-county map had nothing at all for it. But the county does publish two machine-readable
-live feeds in the meantime, and between them there is real precinct-level analysis to
-be had:
-
-  0. a Cast Vote Record export, when one has been obtained (--from-cvr, parsed by
-     ingest/parse_cvr.py). This is the best of the three: one record per ballot, every
-     contest, with the precinct on it. When it is supplied, the results-map feed is
-     not used at all — the CVR covers every contest the feed would have, and many it
-     would not.
-
-  1. electionmaps.alamedacountyca.gov/json/electionResults.json
-     The feed behind the county's own results map. Carries PER-PRECINCT votes, but
-     only for the one or two contests the county chooses to map (Nov 2026: U.S.
-     Representative CD-14 and Measure RTM), plus each precinct's reporting status.
-
-  2. alamedacountyca.gov/rovresults/<id>/
-     The running results portal. Every contest on the ballot, but COUNTYWIDE totals
-     only — no geography.
-
-So this writes one file in exactly the same shape a certified build produces, with:
-  * contests / precincts / cities / aggregates for the precinct-mapped contests, so
-    every existing map mode (winner, margin, % for a choice, stands-out) just works;
-  * a `county_only` list carrying the countywide totals for every other big race, for
-    the panel to show as numbers without a map;
-  * a `preliminary` block with the county's own status banner, update number, last
-    updated time, next scheduled updates, and countywide registration/turnout.
+See docs/pre-certification.md for the three sources and why each exists.
 
 Honesty constraints baked in
 ----------------------------
@@ -72,133 +43,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from county_contests import category, included, sort_key  # noqa: E402
 from filter_county_results import cities_from_contests  # noqa: E402
 import live_map_feed  # noqa: E402
+import portal  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAP_FEED = live_map_feed.FEED_URL
-PORTAL = "https://alamedacountyca.gov/rovresults/{eid}/"
-UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-      "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 UNINC = "Unincorporated"
-
-# ---- portal scraping (same markup as fetch_live_results.py) --------------------
-RACE_SPLIT = re.compile(r"<!--\s*Start Race:\s*(.*?)\s*-->", re.I | re.S)
-ROW = re.compile(r"<TH[^>]*class=\"resultsRow[^\"]*\"[^>]*>(.*?)</TH>\s*"
-                 r"<TD[^>]*>(.*?)</TD>\s*<TD[^>]*>(.*?)</TD>", re.I | re.S)
-DIV = lambda cls: re.compile(r"<div[^>]*class=\"" + cls + r"[^\"]*\"[^>]*>(.*?)</div>",
-                             re.I | re.S)
-REPORTED, PASSING, VOTEFOR = DIV("reported"), DIV("passing"), DIV("votefor")
-# The portal emits no "End Race" marker, so a race's body as split runs to the NEXT
-# "Start Race" comment — which for the last race in a section swallows whatever
-# follows it. In Nov 2026 that made "State Superintendent" absorb the entire
-# propositions table and report Prop 3's 4.2M statewide-style figure as a candidate.
-# Every race block ends with a "Back to Top" link, so cut there.
-BODY_END = re.compile(r'<div[^>]*class="backtotop"|Back to Top', re.I)
-# Propositions are NOT emitted as races. They live in one wide table with its own
-# layout (Title | YES votes | YES % | NO votes | NO %), so they need their own parse
-# or the county map silently loses every state proposition.
-PROPS_BLOCK = re.compile(r'id="panelDtlProps".*?</TABLE>', re.I | re.S)
-PROP_ROW = re.compile(
-    r'<TH[^>]*class="resultsRow[^"]*"[^>]*>(.*?)</TH>\s*'
-    r'<TD[^>]*>(.*?)</TD>\s*<TD[^>]*>(.*?)</TD>\s*'
-    r'<TD[^>]*>(.*?)</TD>\s*<TD[^>]*>(.*?)</TD>', re.I | re.S)
-STATUS_RE = re.compile(r"(Preliminary/Unofficial[^<]*)", re.I)
-UPDATED_RE = re.compile(r"lastUpdated[^>]*>\s*<span>\s*Last Updated:\s*([^<]+)", re.I)
-REG_RE = re.compile(r"Total Registration:\s*([\d,]+)", re.I)
-CAST_RE = re.compile(r"Total Ballots Cast[^\d]*([\d,]+)[^\d]*([\d.]+)\s*%", re.I | re.S)
-PCTS_RE = re.compile(r"(\d[\d,]*)\s+of\s+(\d[\d,]*)\s+Precincts[^(]*\(([\d.]+)%\)", re.I)
-SCHED_RE = re.compile(r"(?:Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day,\s+"
-                      r"(?:January|February|March|April|May|June|July|August|September|"
-                      r"October|November|December)\s+\d{1,2},\s+\d{4}", re.I)
-
-
-def txt(s):
-    s = re.sub(r"(?is)<[^>]+>", " ", s)
-    s = s.replace("&nbsp;", " ").replace("&amp;", "&")
-    return re.sub(r"\s+", " ", s).strip()
-
-
-def as_int(s):
-    s = re.sub(r"[^\d-]", "", txt(s))
-    return int(s) if s not in ("", "-") else 0
-
-
-def as_pct(s):
-    m = re.search(r"-?[\d.]+", txt(s))
-    return float(m.group()) if m else 0.0
-
-
-def fetch(url, timeout=120):
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return r.read().decode("utf-8", "replace")
-
-
-def parse_props(html):
-    """The propositions table, which the portal does not emit as races."""
-    m = PROPS_BLOCK.search(html)
-    if not m:
-        return []
-    out = []
-    for title, yv, yp, nv, np_ in PROP_ROW.findall(m.group(0)):
-        name = txt(title)
-        if not name:
-            continue
-        rows = [{"choice": "Yes", "votes": as_int(yv), "pct": as_pct(yp)},
-                {"choice": "No", "votes": as_int(nv), "pct": as_pct(np_)}]
-        out.append({"name": name, "rcv": False, "kind": "measure", "choices": rows,
-                    "total_votes": sum(r["votes"] for r in rows)})
-    return out
-
-
-def parse_portal(html):
-    """Countywide totals for every contest, plus the status banner."""
-    ms, mu = STATUS_RE.search(html), UPDATED_RE.search(html)
-    head = html[:html.lower().find("start race")] if "start race" in html.lower() else html
-    mr, mc, mp = REG_RE.search(head), CAST_RE.search(head), PCTS_RE.search(head)
-
-    banner = {
-        "status": txt(ms.group(1)) if ms else "Preliminary/Unofficial",
-        "last_updated": txt(mu.group(1)) if mu else "",
-        "registered": as_int(mr.group(1)) if mr else 0,
-        "ballots_cast": as_int(mc.group(1)) if mc else 0,
-        "turnout_pct": float(mc.group(2)) if mc else 0.0,
-    }
-    if mp:
-        banner["precincts_reported"] = as_int(mp.group(1))
-        banner["precincts_total"] = as_int(mp.group(2))
-        banner["precincts_reported_pct"] = float(mp.group(3))
-    sched = SCHED_RE.findall(txt(head))
-    # the first schedule date equal to or after "last updated" is the next release;
-    # the banner's own date is in the same list, so dedupe against it
-    banner["next_updates"] = [d for d in dict.fromkeys(sched)
-                              if d.lower() not in banner["last_updated"].lower()]
-
-    contests = []
-    parts = RACE_SPLIT.split(html)
-    for i in range(1, len(parts) - 1, 2):
-        name, body = txt(parts[i]), BODY_END.split(parts[i + 1])[0]
-        rows = [{"choice": txt(ch), "votes": as_int(v), "pct": as_pct(p)}
-                for ch, v, p in ROW.findall(body) if txt(ch)]
-        if not rows:
-            continue
-        rcv = "(RCV)" in name
-        clean = re.sub(r"\s*\(RCV\)\s*$", "", name).strip()
-        e = {"name": clean, "rcv": rcv,
-             "kind": "measure" if any(re.fullmatch(r"(bonds\s+)?(yes|no)", r["choice"], re.I)
-                                      for r in rows) else "candidate",
-             "choices": rows, "total_votes": sum(r["votes"] for r in rows)}
-        for key, rx in (("reported", REPORTED), ("threshold", PASSING), ("vote_for", VOTEFOR)):
-            m = rx.search(body)
-            if m:
-                e[key] = txt(m.group(1))
-        contests.append(e)
-    contests.extend(parse_props(html))
-    return banner, contests
-
-
-# The precinct-level feed parse lives in live_map_feed.py — the Berkeley build reads
-# the same feed, so there is one parser rather than two that can drift apart.
-
 
 def from_cvr(cvr):
     """Shape a parsed CVR like parse_map_feed's output, keeping the big contests.
@@ -228,6 +77,10 @@ def from_cvr(cvr):
     return mapped, meta, {}
 
 
+# The portal's markup quirks — no "End Race" marker, propositions emitted outside the
+# race comments — live in portal.py, which the Berkeley build reads too.
+
+
 def agg(entries):
     out = {"choices": {}}
     for e in entries:
@@ -249,7 +102,7 @@ def main():
     geo_city = {str(f["properties"]["precinct"]): f["properties"].get("city", UNINC)
                 for f in geo["features"]}
 
-    ov_path = opt.get("overrides") or os.path.join(ROOT, "data", "processed", "county",
+    ov_path = opt.get("overrides") or os.path.join(ROOT, "data", "processed",
                                                    "city_overrides.json")
     overrides = {}
     if os.path.exists(str(ov_path)):
@@ -305,15 +158,15 @@ def main():
         sys.exit(1)
 
     # ---- feed 2: countywide totals for everything else -------------------------
-    banner, portal = {}, []
+    banner, portal_races = {}, []
     if not opt.get("no-portal"):
         rov = opt.get("rov-id")
-        purl = opt.get("portal-url") or (PORTAL.format(eid=rov) if rov else None)
+        purl = opt.get("portal-url") or (portal.URL.format(eid=rov) if rov else None)
         if not purl:
             print("ERROR: --rov-id or --portal-url is required (or pass --no-portal)",
                   file=sys.stderr)
             sys.exit(1)
-        banner, portal = parse_portal(fetch(purl))
+        banner, portal_races = portal.parse(portal.fetch(url=purl))
         banner["portal_url"] = purl
     if map_url:
         banner["map_feed_url"] = map_url
@@ -329,7 +182,7 @@ def main():
     if cvr is None:
         recon = live_map_feed.reconcile(mapped, meta)
     else:
-        portal_by_name = {c["name"]: c for c in portal}
+        portal_by_name = {c["name"]: c for c in portal_races}
         recon = {}
         for n, pr in mapped.items():
             got = sum(v for ch in pr.values() for v in ch.values())
@@ -374,7 +227,7 @@ def main():
                           if any(n in precincts[p]["contests"] for p in pids)}
 
     # every other big race: countywide numbers, no geography
-    county_only = [dict(c) for c in portal
+    county_only = [dict(c) for c in portal_races
                    if included(c["name"]) and c["name"] not in contests]
     for c in county_only:
         c["category"] = category(c["name"])

@@ -332,7 +332,7 @@
         "precincts_total": 627,
         "precincts_reported_pct": 100.0,
         "portal_url": "https://alamedacountyca.gov/rovresults/260/",
-        "fetched_at": "2026-11-10T11:14:25-0800",
+        "fetched_at": "2026-11-13T11:25:59-0800",
         "reconciled": true,
         "note": "Preliminary. Precinct-level figures come from the county's live results map feed and cover only the contests the county chooses to map; every other big race is countywide-only until the certified Statement of Vote is published. Per-precinct registration and turnout do not exist in either live feed."
       },

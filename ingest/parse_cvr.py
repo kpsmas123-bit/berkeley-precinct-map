@@ -4,27 +4,10 @@ Parse a Dominion Democracy Suite **Cast Vote Record** export into the same resul
 shape the canvass parsers emit, so the rest of the county pipeline consumes it
 unchanged.
 
-Why this exists
----------------
-Alameda County publishes the precinct-level Statement of Vote only at certification,
-and its live results-map feed covers just the one or two contests it chooses to map.
-The CVR is the third door: one record per ballot, each carrying the precinct portion
-it was cast in, for **every** contest on that ballot. The county releases it on
-request (an Airtable form linked from the results portal), so a CVR in hand gives a
-full precinct breakdown of races the portal only reports countywide.
+See docs/pre-certification.md for why a CVR is read at all.
 
-Format
-------
-The export is a directory (often zipped) of JSON files, documented by the vendor in
-"CVR export file format" — San Francisco publishes both that spec and a real export,
-which is where this implementation's field names come from:
-
-  ContestManifest.json          Id -> Description, VoteFor, NumOfRanks
-  CandidateManifest.json        Id -> Description, ContestId, Type
-  PrecinctPortionManifest.json  Id -> Description, ExternalId, PrecinctId
-  PrecinctManifest.json         Id -> Description, ExternalId
-  CountingGroupManifest.json    Id -> Description (Election Day, Vote by Mail, Youth…)
-  CvrExport*.json               the ballots ("Sessions")
+The export is a directory (often zipped) of JSON manifests plus CvrExport*.json,
+the ballots ("Sessions"); field names follow the vendor's "CVR export file format".
 
 Where the vendor spec and the real export disagree
 --------------------------------------------------
